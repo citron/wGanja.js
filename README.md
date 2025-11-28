@@ -11,12 +11,12 @@ overloading and algebraic constants.
 cite as [![DOI](https://zenodo.org/badge/98999731.svg)](https://zenodo.org/badge/latestdoi/98999731)
 
 ```bibtex
-@misc{https://doi.org/10.5281/zenodo.3635774,
+@misc{ganja.js,
   doi = {10.5281/ZENODO.3635774},
   url = {https://zenodo.org/record/3635774},
   author = {De Keninck,  Steven},
   title = {ganja.js},
-  publisher = {Zenodo},
+  howpublished = {Zenodo. https://doi.org/10.5281/ZENODO.3635774},
   year = {2020}
 }
 ```
@@ -202,7 +202,7 @@ specify basis blades and allows using arrays or lambda expressions without
 the need for calling brackets in algebraic expressions.
 
 ```javascript
-Algebra(2,0,1,()={
+Algebra(2,0,1,()=>{
 
   // Direct specification of basis blades using e-notation.
   var xy_bivector = 1e12,
