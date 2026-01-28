@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Float64Array Precision Example - Ganja.js</title>
+  <style>
+    body {
+      font-family: 'Courier New', monospace;
+      max-width: 1200px;
+      margin: 20px auto;
+      padding: 20px;
+      background: #1e1e1e;
+      color: #d4d4d4;
+    }
+    h1 {
+      color: #4ec9b0;
+      border-bottom: 2px solid #4ec9b0;
+      padding-bottom: 10px;
+    }
+    h2 {
+      color: #569cd6;
+      margin-top: 30px;
+    }
+    .test-section {
+      background: #252526;
+      padding: 20px;
+      margin: 20px 0;
+      border-radius: 5px;
+      border-left: 4px solid #569cd6;
+    }
+    .result {
+      background: #1e1e1e;
+      padding: 15px;
+      margin: 10px 0;
+      border-radius: 3px;
+      font-size: 14px;
+    }
+    .highlight {
+      color: #ce9178;
+    }
+    .error {
+      color: #f48771;
+    }
+    .success {
+      color: #4ec9b0;
+    }
+    .code {
+      background: #1e1e1e;
+      padding: 10px;
+      border-radius: 3px;
+      overflow-x: auto;
+      margin: 10px 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+    }
+    th, td {
+      padding: 10px;
+      text-align: left;
+      border-bottom: 1px solid #3e3e42;
+    }
+    th {
+      background: #37373d;
+      color: #4ec9b0;
+    }
+    tr:hover {
+      background: #2d2d30;
+    }
+    .metric {
+      display: inline-block;
+      min-width: 120px;
+      padding: 5px 10px;
+      margin: 5px;
+      background: #37373d;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔬 Float64Array Precision Enhancement in Ganja.js</h1>
+  
+  <p>
+    This example demonstrates the precision improvements when using <span class="highlight">Float64Array</span> 
+    (double precision) instead of the default <span class="highlight">Float32Array</span> (single precision) 
+    for geometric algebra operations.
+  </p>
+
+  <div class="test-section">
+    <h2>📊 Test 1: Iterative Computation Accumulation</h2>
+    <p>Computing the sum of a small number repeatedly shows how errors accumulate in iterative computations.</p>
+    <div id="test1-results"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>🔢 Test 2: High-Precision Scalar Operations</h2>
+    <p>Operations with very small or very large numbers demonstrate precision limits.</p>
+    <div id="test2-results"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>🌀 Test 3: Rotor Composition (PGA3D)</h2>
+    <p>Repeated rotor applications in 3D Projective Geometric Algebra show accumulated rotation errors.</p>
+    <div id="test3-results"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>🎯 Test 4: Inverse Computation Accuracy</h2>
+    <p>Computing inverse and verifying A * A^-1 = 1 shows numerical stability.</p>
+    <div id="test4-results"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>📈 Summary</h2>
+    <div id="summary-results"></div>
+  </div>
+
+  <script src="../ganja.js"></script>
+  <script>
+    function formatNumber(num) {
+      if (Math.abs(num) < 1e-10) return '0';
+      if (Math.abs(num) < 1e-3 || Math.abs(num) > 1e6) {
+        return num.toExponential(15);
+      }
+      return num.toPrecision(15);
+    }
+
+    function computeError(actual, expected) {
+      if (expected === 0) return Math.abs(actual);
+      return Math.abs((actual - expected) / expected);
+    }
+
+    // Test 1: Iterative accumulation
+    function test1() {
+      const iterations = 1000000;
+      const smallValue = 1e-7;
+      
+      // Float32
+      const Alg32 = Algebra(3);
+      const a32 = new Alg32();
+      a32[0] = 0;
+      for (let i = 0; i < iterations; i++) {
+        a32[0] += smallValue;
+      }
+      const result32 = a32[0];
+      
+      // Float64
+      const Alg64 = Algebra({p:3, baseType: Float64Array});
+      const a64 = new Alg64();
+      a64[0] = 0;
+      for (let i = 0; i < iterations; i++) {
+        a64[0] += smallValue;
+      }
+      const result64 = a64[0];
+      
+      const expected = iterations * smallValue;
+      const error32 = computeError(result32, expected);
+      const error64 = computeError(result64, expected);
+      
+      return {
+        iterations,
+        smallValue,
+        expected,
+        result32,
+        result64,
+        error32,
+        error64,
+        improvement: error32 / error64
+      };
+    }
+
+    // Test 2: High precision scalars
+    function test2() {
+      const value1 = 1.0 + 1e-8;
+      const value2 = 1.0;
+      
+      // Float32
+      const Alg32 = Algebra(2);
+      const a32 = new Alg32();
+      const b32 = new Alg32();
+      a32[0] = value1;
+      b32[0] = value2;
+      const diff32 = a32.Sub(b32)[0];
+      
+      // Float64
+      const Alg64 = Algebra({p:2, baseType: Float64Array});
+      const a64 = new Alg64();
+      const b64 = new Alg64();
+      a64[0] = value1;
+      b64[0] = value2;
+      const diff64 = a64.Sub(b64)[0];
+      
+      const expected = 1e-8;
+      const error32 = computeError(diff32, expected);
+      const error64 = computeError(diff64, expected);
+      
+      return {
+        value1,
+        value2,
+        expected,
+        diff32,
+        diff64,
+        error32,
+        error64,
+        improvement: error32 / error64
+      };
+    }
+
+    // Test 3: Rotor composition (PGA3D)
+    function test3() {
+      const iterations = 1000;
+      
+      // Float32 - PGA3D (3,0,1)
+      const PGA32 = Algebra({p:3, r:1});
+      const result32 = PGA32(()=>{
+        // Create a small rotation rotor around the z-axis
+        const angle = 0.01; // Small angle to make errors more visible
+        const rotor = Math.cos(angle/2) - Math.sin(angle/2) * 1e12;
+        
+        // Start with a point
+        let point = !(1e1 + 2e2 + 3e3);
+        
+        // Apply rotor many times
+        for (let i = 0; i < iterations; i++) {
+          point = rotor >>> point >>> ~rotor;
+        }
+        
+        return point;
+      });
+      
+      // Float64 - PGA3D (3,0,1)
+      const PGA64 = Algebra({p:3, r:1, baseType: Float64Array});
+      const result64 = PGA64(()=>{
+        const angle = 0.01;
+        const rotor = Math.cos(angle/2) - Math.sin(angle/2) * 1e12;
+        
+        let point = !(1e1 + 2e2 + 3e3);
+        
+        for (let i = 0; i < iterations; i++) {
+          point = rotor >>> point >>> ~rotor;
+        }
+        
+        return point;
+      });
+      
+      // The point should rotate by iterations * angle around z-axis
+      // Extract coordinates and compute difference from expected
+      const x32 = result32[1];
+      const y32 = result32[2];
+      const z32 = result32[3];
+      
+      const x64 = result64[1];
+      const y64 = result64[2];
+      const z64 = result64[3];
+      
+      // Check norm preservation (should be constant)
+      const norm32 = Math.sqrt(x32*x32 + y32*y32 + z32*z32);
+      const norm64 = Math.sqrt(x64*x64 + y64*y64 + z64*z64);
+      const expectedNorm = Math.sqrt(1*1 + 2*2 + 3*3);
+      
+      return {
+        iterations,
+        norm32,
+        norm64,
+        expectedNorm,
+        normError32: computeError(norm32, expectedNorm),
+        normError64: computeError(norm64, expectedNorm),
+        improvement: computeError(norm32, expectedNorm) / computeError(norm64, expectedNorm)
+      };
+    }
+
+    // Test 4: Inverse accuracy
+    function test4() {
+      // Float32
+      const Alg32 = Algebra(3);
+      const a32 = Alg32(()=> 2 + 3e1 + 4e2 + 5e3 + 6e12 + 7e13 + 8e23 + 9e123);
+      const inv32 = a32.Inverse;
+      const product32 = a32.Mul(inv32);
+      const error32 = Math.abs(product32[0] - 1) + 
+                      product32.slice(1).reduce((sum, x) => sum + Math.abs(x), 0);
+      
+      // Float64
+      const Alg64 = Algebra({p:3, baseType: Float64Array});
+      const a64 = Alg64(()=> 2 + 3e1 + 4e2 + 5e3 + 6e12 + 7e13 + 8e23 + 9e123);
+      const inv64 = a64.Inverse;
+      const product64 = a64.Mul(inv64);
+      const error64 = Math.abs(product64[0] - 1) + 
+                      product64.slice(1).reduce((sum, x) => sum + Math.abs(x), 0);
+      
+      return {
+        error32,
+        error64,
+        improvement: error32 / error64
+      };
+    }
+
+    // Run all tests and display results
+    function runTests() {
+      const r1 = test1();
+      document.getElementById('test1-results').innerHTML = `
+        <div class="result">
+          <strong>Configuration:</strong> Adding ${formatNumber(r1.smallValue)} 
+          for ${r1.iterations.toLocaleString()} iterations
+        </div>
+        <table>
+          <tr>
+            <th>Metric</th>
+            <th>Float32Array</th>
+            <th>Float64Array</th>
+          </tr>
+          <tr>
+            <td>Expected Result</td>
+            <td colspan="2" class="highlight">${formatNumber(r1.expected)}</td>
+          </tr>
+          <tr>
+            <td>Actual Result</td>
+            <td>${formatNumber(r1.result32)}</td>
+            <td class="success">${formatNumber(r1.result64)}</td>
+          </tr>
+          <tr>
+            <td>Relative Error</td>
+            <td class="error">${r1.error32.toExponential(3)}</td>
+            <td class="success">${r1.error64.toExponential(3)}</td>
+          </tr>
+        </table>
+        <div class="result">
+          <span class="success">✓ Float64Array is ${r1.improvement.toFixed(0)}× more accurate</span>
+        </div>
+      `;
+
+      const r2 = test2();
+      document.getElementById('test2-results').innerHTML = `
+        <div class="result">
+          <strong>Configuration:</strong> Computing (${r2.value1}) - (${r2.value2})
+        </div>
+        <table>
+          <tr>
+            <th>Metric</th>
+            <th>Float32Array</th>
+            <th>Float64Array</th>
+          </tr>
+          <tr>
+            <td>Expected Difference</td>
+            <td colspan="2" class="highlight">${formatNumber(r2.expected)}</td>
+          </tr>
+          <tr>
+            <td>Actual Difference</td>
+            <td>${formatNumber(r2.diff32)}</td>
+            <td class="success">${formatNumber(r2.diff64)}</td>
+          </tr>
+          <tr>
+            <td>Relative Error</td>
+            <td class="error">${r2.error32.toExponential(3)}</td>
+            <td class="success">${r2.error64.toExponential(3)}</td>
+          </tr>
+        </table>
+        <div class="result">
+          <span class="success">✓ Float64Array is ${r2.improvement.toFixed(0)}× more accurate</span>
+        </div>
+      `;
+
+      const r3 = test3();
+      document.getElementById('test3-results').innerHTML = `
+        <div class="result">
+          <strong>Configuration:</strong> Applying rotor ${r3.iterations} times to a point
+        </div>
+        <table>
+          <tr>
+            <th>Metric</th>
+            <th>Float32Array</th>
+            <th>Float64Array</th>
+          </tr>
+          <tr>
+            <td>Expected Norm</td>
+            <td colspan="2" class="highlight">${formatNumber(r3.expectedNorm)}</td>
+          </tr>
+          <tr>
+            <td>Actual Norm</td>
+            <td>${formatNumber(r3.norm32)}</td>
+            <td class="success">${formatNumber(r3.norm64)}</td>
+          </tr>
+          <tr>
+            <td>Norm Error</td>
+            <td class="error">${r3.normError32.toExponential(3)}</td>
+            <td class="success">${r3.normError64.toExponential(3)}</td>
+          </tr>
+        </table>
+        <div class="result">
+          <span class="success">✓ Float64Array is ${r3.improvement.toFixed(0)}× more accurate</span>
+        </div>
+      `;
+
+      const r4 = test4();
+      document.getElementById('test4-results').innerHTML = `
+        <div class="result">
+          <strong>Configuration:</strong> Computing A × A<sup>-1</sup> and measuring deviation from identity
+        </div>
+        <table>
+          <tr>
+            <th>Metric</th>
+            <th>Float32Array</th>
+            <th>Float64Array</th>
+          </tr>
+          <tr>
+            <td>Total Error in A × A<sup>-1</sup></td>
+            <td class="error">${r4.error32.toExponential(3)}</td>
+            <td class="success">${r4.error64.toExponential(3)}</td>
+          </tr>
+        </table>
+        <div class="result">
+          <span class="success">✓ Float64Array is ${r4.improvement.toFixed(0)}× more accurate</span>
+        </div>
+      `;
+
+      // Summary
+      const avgImprovement = ((r1.improvement + r2.improvement + r3.improvement + r4.improvement) / 4).toFixed(1);
+      document.getElementById('summary-results').innerHTML = `
+        <div class="result">
+          <h3 style="color: #4ec9b0;">Key Findings:</h3>
+          <p>
+            ✓ <strong>Average Precision Improvement:</strong> <span class="success">${avgImprovement}×</span> better accuracy with Float64Array
+          </p>
+          <p>
+            ✓ <strong>Use Case Recommendations:</strong>
+          </p>
+          <ul>
+            <li><span class="highlight">Float64Array</span> - Recommended for:
+              <ul>
+                <li>Scientific computing and simulations</li>
+                <li>Iterative algorithms (physics, optimization)</li>
+                <li>High-dimensional geometric algebra operations</li>
+                <li>Applications where numerical stability is critical</li>
+              </ul>
+            </li>
+            <li><span class="highlight">Float32Array</span> - Suitable for:
+              <ul>
+                <li>Graphics and visualization (WebGL compatibility)</li>
+                <li>Memory-constrained environments</li>
+                <li>Applications where precision requirements are moderate</li>
+              </ul>
+            </li>
+          </ul>
+          <p>
+            <strong>Usage:</strong>
+          </p>
+          <div class="code">
+// Use Float64Array for higher precision<br>
+const PGA = Algebra({p:3, r:1, baseType: Float64Array});<br>
+<br>
+// Default Float32Array<br>
+const PGA = Algebra({p:3, r:1}); // or Algebra(3,0,1)
+          </div>
+        </div>
+      `;
+    }
+
+    // Run tests when page loads
+    runTests();
+  </script>
+</body>
+</html>
