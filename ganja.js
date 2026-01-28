@@ -1888,20 +1888,48 @@
         var interprete = function(e) {
           if (!(e instanceof Element)) return null;
           
-          // Point (grade 3 in PGA3D or conformal point)
-          if (e.e123 || (options.conformal && e.Grade(1).Length > 0.01)) {
-            var pos;
-            if (options.conformal) {
-              // CGA point extraction
-              pos = [e[1] || 0, e[2] || 0, e[3] || 0];
-            } else {
-              // PGA point
-              pos = [
-                -e[13] / e[14] || 0,
-                e[12] / e[14] || 0,
-                e[11] / e[14] || 0
-              ];
+          // For CGA, use proper interpretation
+          if (options.conformal && tot == 5) {
+            var ni = Element.Coeff(4,1).Add(Element.Coeff(5,1));
+            var no = Element.Coeff(4,0.5).Sub(Element.Coeff(5,0.5));
+            var X2 = (e.Mul(e)).s;
+            var epsilon = 0.000001 / (options.scale || 1);
+            var opnix = ni.Wedge(e), ipnix = ni.LDot(e);
+            var opnixzero = opnix.VLength < epsilon, ipnixzero = ipnix.VLength < epsilon;
+            var x2zero = Math.abs(X2) < epsilon;
+            
+            // Bound vec,biv,tri (points)
+            if (x2zero && !opnixzero && !ipnixzero) {
+              var pos = [...(Element.LDot(1/(ni.LDot(e)).s, e)).slice(1,4)].map(x => -x * (options.scale || 1));
+              return { type: 'point', pos: pos };
             }
+            
+            // Sphere
+            if (!x2zero && e.Grade(1).VLength) {
+              var nix = ni.Wedge(e), nix2 = (nix.Mul(nix)).s;
+              var pos = [...(e.Mul(ni).Mul(e)).slice(1,4)].map(x => -x / (2.0 * nix2) * (options.scale || 1));
+              var weight2 = Math.abs((e.LDot(e)).s / nix2) ** 0.5 * (options.scale || 1);
+              return { type: 'sphere', pos: pos, radius: weight2 };
+            }
+            
+            // Circle
+            if (!x2zero && e.Grade(3).VLength) {
+              var nix = ni.Wedge(e), nix2 = (nix.Mul(nix)).s;
+              var pos = [...(e.Mul(ni).Mul(e)).slice(1,4)].map(x => -x / (2.0 * nix2) * (options.scale || 1));
+              var weight2 = Math.abs((e.LDot(e)).s / nix2) ** 0.5 * (options.scale || 1);
+              return { type: 'circle', pos: pos, radius: weight2 };
+            }
+            
+            return null;
+          }
+          
+          // Point (grade 3 in PGA3D)
+          if (e.e123) {
+            var pos = [
+              -e[13] / e[14] || 0,
+              e[12] / e[14] || 0,
+              e[11] / e[14] || 0
+            ];
             return { type: 'point', pos: pos };
           }
           
@@ -2007,6 +2035,40 @@
                 }
                 scene.add(point);
                 geometryGroups.push(point);
+              }
+              
+              // Handle spheres (CGA)
+              if (interp && interp.type === 'sphere') {
+                var sphereGeom = new THREE.SphereGeometry(
+                  interp.radius,
+                  options.sphereSegments || 32,
+                  options.sphereSegments || 32
+                );
+                var sphereMat = createMaterial(currentColor);
+                sphereMat.opacity = options.sphereOpacity || 0.7;
+                sphereMat.transparent = true;
+                var sphere = new THREE.Mesh(sphereGeom, sphereMat);
+                sphere.position.set(...interp.pos);
+                if (options.shadowMap !== false) {
+                  sphere.castShadow = true;
+                  sphere.receiveShadow = true;
+                }
+                scene.add(sphere);
+                geometryGroups.push(sphere);
+              }
+              
+              // Handle circles (CGA)
+              if (interp && interp.type === 'circle') {
+                var circleGeom = new THREE.RingGeometry(
+                  interp.radius * 0.95,
+                  interp.radius,
+                  options.circleSegments || 64
+                );
+                var circleMat = createMaterial(currentColor, { doubleSided: true });
+                var circle = new THREE.Mesh(circleGeom, circleMat);
+                circle.position.set(...interp.pos);
+                scene.add(circle);
+                geometryGroups.push(circle);
               }
               
               // Handle planes as quads
