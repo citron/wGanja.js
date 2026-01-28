@@ -1,0 +1,111 @@
+<HEAD>
+  <SCRIPT SRC="../ganja.js"></SCRIPT>
+</HEAD>
+<BODY>
+<h1>Sparse Multivector Support - 10D Algebra Memory Comparison</h1>
+<pre id="output"></pre>
+<SCRIPT>
+  const output = document.getElementById('output');
+  
+  function log(msg) {
+    output.textContent += msg + '\n';
+  }
+  
+  function getMemoryUsage(mv) {
+    if (mv._sparse) {
+      // Sparse mode: count non-zero entries
+      return Object.keys(mv._coeffs).length;
+    } else {
+      // Dense mode: all entries stored
+      return mv.length;
+    }
+  }
+  
+  // Test 1: Compare dense vs sparse for 10D algebra (2^10 = 1024 basis blades)
+  log('=== 10D Geometric Algebra (1024 basis blades) ===\n');
+  
+  // Create dense algebra
+  const DenseAlgebra = Algebra(10);
+  log(`Dense Algebra: ${DenseAlgebra.prototype.length} total basis blades`);
+  
+  // Create sparse algebra
+  const SparseAlgebra = Algebra({p:10, sparse:true});
+  log(`Sparse Algebra: ${SparseAlgebra.prototype.length} total basis blades`);
+  log('');
+  
+  // Test 2: Create sparse multivector with few non-zero elements
+  log('=== Creating sparse multivector with 5 non-zero coefficients ===');
+  const sparse_mv = new SparseAlgebra();
+  sparse_mv[0] = 1.0;    // scalar
+  sparse_mv[1] = 2.0;    // e1
+  sparse_mv[2] = 3.0;    // e2
+  sparse_mv[10] = 1.5;   // some bivector
+  sparse_mv[100] = 0.5;  // some higher grade
+  
+  log(`Sparse storage: ${getMemoryUsage(sparse_mv)} entries stored`);
+  log(`Memory saved: ${((1 - getMemoryUsage(sparse_mv) / 1024) * 100).toFixed(2)}%`);
+  log(`String representation: ${sparse_mv.toString()}`);
+  log('');
+  
+  // Test 3: Create dense equivalent
+  log('=== Creating dense multivector with same 5 non-zero coefficients ===');
+  const dense_mv = new DenseAlgebra();
+  dense_mv[0] = 1.0;
+  dense_mv[1] = 2.0;
+  dense_mv[2] = 3.0;
+  dense_mv[10] = 1.5;
+  dense_mv[100] = 0.5;
+  
+  log(`Dense storage: ${getMemoryUsage(dense_mv)} entries stored (all zeros included)`);
+  log(`String representation: ${dense_mv.toString()}`);
+  log('');
+  
+  // Test 4: Operations on sparse multivectors
+  log('=== Testing operations on sparse multivectors ===');
+  const sparse_mv2 = new SparseAlgebra();
+  sparse_mv2[0] = 0.5;
+  sparse_mv2[3] = 1.0;
+  sparse_mv2[50] = 2.0;
+  
+  log(`sparse_mv elements: ${getMemoryUsage(sparse_mv)} non-zero`);
+  log(`sparse_mv2 elements: ${getMemoryUsage(sparse_mv2)} non-zero`);
+  
+  // Addition
+  const sparse_sum = sparse_mv.Add(sparse_mv2);
+  log(`After Add: ${getMemoryUsage(sparse_sum)} non-zero elements`);
+  log(`Result (first 10 coeffs): ${Array.from({length:10}, (_, i) => sparse_sum[i] || 0).join(', ')}`);
+  log('');
+  
+  // Scalar multiplication
+  const sparse_scaled = sparse_mv.Scale(2.0);
+  log(`After Scale(2.0): ${getMemoryUsage(sparse_scaled)} non-zero elements`);
+  log(`Result (first 10 coeffs): ${Array.from({length:10}, (_, i) => sparse_scaled[i] || 0).join(', ')}`);
+  log('');
+  
+  // Test 5: Very sparse case (typical in high-dimensional algebras)
+  log('=== Very sparse multivector (1% filled) ===');
+  const very_sparse = new SparseAlgebra();
+  for (let i = 0; i < 10; i++) {
+    very_sparse[i * 100 + i] = Math.random();
+  }
+  log(`Storage: ${getMemoryUsage(very_sparse)} / 1024 = ${(getMemoryUsage(very_sparse) / 1024 * 100).toFixed(2)}%`);
+  log(`Memory saved vs dense: ${((1 - getMemoryUsage(very_sparse) / 1024) * 100).toFixed(2)}%`);
+  log('');
+  
+  // Test 6: Comparison table
+  log('=== Memory Usage Comparison Table ===');
+  log('┌────────────────────┬─────────┬──────────┬─────────────┐');
+  log('│ Multivector        │ Mode    │ Stored   │ Memory %    │');
+  log('├────────────────────┼─────────┼──────────┼─────────────┤');
+  log(`│ 5 coefficients     │ Dense   │ ${getMemoryUsage(dense_mv).toString().padEnd(8)} │ 100.00%     │`);
+  log(`│ 5 coefficients     │ Sparse  │ ${getMemoryUsage(sparse_mv).toString().padEnd(8)} │ ${(getMemoryUsage(sparse_mv)/1024*100).toFixed(2).padEnd(10)}% │`);
+  log(`│ 10 coefficients    │ Sparse  │ ${getMemoryUsage(very_sparse).toString().padEnd(8)} │ ${(getMemoryUsage(very_sparse)/1024*100).toFixed(2).padEnd(10)}% │`);
+  log('└────────────────────┴─────────┴──────────┴─────────────┘');
+  log('');
+  
+  log('=== Summary ===');
+  log('Sparse storage is ideal for high-dimensional algebras where multivectors');
+  log('typically have many zero coefficients (e.g., in QCGA, high-dim PGA).');
+  log(`For this 10D algebra with sparse multivectors, memory savings: ~${((1 - 5/1024) * 100).toFixed(1)}%`);
+</SCRIPT>
+</BODY>
