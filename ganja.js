@@ -102,6 +102,7 @@
   *     [Cayley:Cayley],                   => optional custom Cayley table (strings). (e.g. [['1','e1'],['e1','-1']])
   *     [mix:boolean],                     => Allows mixing of various algebras. (for space efficiency).
   *     [graded:boolean],                  => Use a graded algebra implementation. (automatic for +6D)
+  *     [sparse:boolean],                  => Use sparse storage (only non-zero coefficients). Ideal for high-dim algebras.
   *     [baseType:Float32Array]            => optional basetype to use. (only for flat generator)
   *   },[func])                            => optional function for the translator.
  **/
@@ -191,10 +192,13 @@
     });
 
   /// Flat Algebra Multivector Base Class.
+  /// When sparse option is enabled, multivectors store only non-zero coefficients in an object,
+  /// providing significant memory savings for high-dimensional algebras (e.g., 10D, QCGA).
+  /// A Proxy intercepts array-like indexed access to provide transparent coefficient access.
     var generator = options.sparse ? class MultiVector {
     /// constructor for sparse mode - use an object to store only non-zero coefficients
       constructor(a) { 
-        this._coeffs = {}; 
+        this._coeffs = {};  // Object storing {index: value} for non-zero coefficients only
         this._sparse = true;
         this.length = basis.length;
         if (a && typeof a === 'number') {
