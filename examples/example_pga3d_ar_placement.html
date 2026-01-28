@@ -30,7 +30,6 @@ Algebra(3,0,1,()=>{
   
   // Define basic geometric primitives in PGA
   var point = (x,y,z)=>!(1e0 + x*1e1 + y*1e2 + z*1e3);
-  var line = (...plucker)=>plucker*[1e01,1e02,1e03,1e12,1e13,1e23];
   
   // AR placement state
   var placedObjects = [];
@@ -61,12 +60,11 @@ Algebra(3,0,1,()=>{
   };
   
   // Hit test callback for AR placement
-  var onHitTest = (hitPose, sceneData) => {
+  var onHitTest = (hitPose) => {
     // Store the hit pose matrix for potential object placement
-    hitPoseMatrix = hitPose.transform.matrix;
-    
-    // You could automatically place objects here
-    // or wait for user interaction (tap/click)
+    if (hitPose && hitPose.transform && hitPose.transform.matrix) {
+      hitPoseMatrix = hitPose.transform.matrix;
+    }
   };
   
   // Scene generation function
@@ -93,8 +91,9 @@ Algebra(3,0,1,()=>{
       previewCube.forEach(edge => objects.push(edge));
     }
     
-    // Add instructions
+    // Add instructions with position
     objects.push(0x224488);
+    objects.push(point(0, 1.5, -1));
     objects.push("Tap surface to place objects");
     
     return objects;

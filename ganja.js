@@ -1767,6 +1767,12 @@
         var canvas = Element.graphGL(f, options);
         var gl = canvas.getContext('webgl');
         
+        // Validate WebGL context
+        if (!gl) {
+          console.error('Failed to get WebGL context');
+          return canvas;
+        }
+        
         // XR button and UI container
         var container = document.createElement('div');
         container.style.position = 'relative';
@@ -1811,6 +1817,8 @@
         
         // XR session management
         xrButton.onclick = function() {
+          if (xrButton.disabled) return; // Don't proceed if button is disabled
+          
           if (xrSession) {
             xrSession.end();
           } else {
@@ -1836,12 +1844,19 @@
                   session.requestReferenceSpace('viewer').then(function(viewerSpace) {
                     session.requestHitTestSource({ space: viewerSpace }).then(function(hitTestSource) {
                       xrHitTestSource = hitTestSource;
+                    }).catch(function(err) {
+                      console.warn('Hit test source creation failed:', err);
                     });
+                  }).catch(function(err) {
+                    console.warn('Viewer space request failed:', err);
                   });
                 }
                 
                 // Start XR render loop
                 session.requestAnimationFrame(onXRFrame);
+              }).catch(function(err) {
+                console.error('Reference space request failed:', err);
+                session.end();
               });
               
               session.addEventListener('end', function() {
@@ -1877,9 +1892,11 @@
           // Handle hit-testing for AR object placement
           if (xrHitTestSource && xrFrame.getHitTestResults) {
             var hitTestResults = xrFrame.getHitTestResults(xrHitTestSource);
-            if (hitTestResults.length > 0 && options.onHitTest) {
+            if (hitTestResults.length > 0) {
               var hitPose = hitTestResults[0].getPose(xrRefSpace);
-              options.onHitTest(hitPose, sceneData);
+              if (hitPose && options.onHitTest) {
+                options.onHitTest(hitPose, sceneData);
+              }
             }
           }
           
@@ -1889,14 +1906,13 @@
             var viewport = glLayer.getViewport(view);
             gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
             
-            // Update camera from XR view
-            // The canvas.update function will use these if we could inject them
-            // For now, we trigger a manual update with XR camera data
-            // This is a simplified version - full integration would require modifying canvas.update
-            
-            // Note: This is a basic implementation. Full XR support would require
-            // deeper integration with the canvas.update rendering pipeline
-            // to properly set view and projection matrices from XR pose data
+            // Trigger canvas update for this view
+            // Note: Full XR rendering integration requires deeper changes to canvas.update
+            // to properly integrate XR view and projection matrices
+            // For now, this calls the regular update which renders to the XR framebuffer
+            if (canvas.update) {
+              canvas.update(sceneData);
+            }
           }
         }
         
