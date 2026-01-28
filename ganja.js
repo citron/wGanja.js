@@ -231,9 +231,9 @@
           },
           set(target, prop, value, receiver) {
             // Handle numeric indices for coefficient setting
-            if (typeof prop === 'string' && !isNaN(prop)) {
+            if ((typeof prop === 'string' || typeof prop === 'number') && !isNaN(prop)) {
               const idx = parseInt(prop);
-              if (value === 0 || value === undefined) {
+              if (value === 0 || value === undefined || Number.isNaN(value)) {
                 delete target._coeffs[idx];
               } else {
                 target._coeffs[idx] = value;
@@ -248,13 +248,15 @@
       }
       
       // Sparse helper: get non-zero indices
+      // Returns: Array of integer indices that have non-zero coefficients
       getNonZeroIndices() {
         return Object.keys(this._coeffs).map(k => parseInt(k));
       }
       
       // Sparse helper: iterate only over non-zero coefficients
+      // fn(index, value) - callback function called for each non-zero coefficient
       forEachNonZero(fn) {
-        for (let idx in this._coeffs) {
+        for (let idx of Object.keys(this._coeffs)) {
           fn(parseInt(idx), this._coeffs[idx]);
         }
       }
@@ -294,9 +296,9 @@
     generator.prototype.Grade = function(grade,res) { 
       res=res||new this.constructor(); 
       if (this._sparse) {
-        for (var idx in this._coeffs) {
-          var i = parseInt(idx);
-          if (grades[i]==grade) res[i]=this._coeffs[i];
+        for (let idx of Object.keys(this._coeffs)) {
+          let i = parseInt(idx);
+          if (grades[i]==grade) res[i]=this._coeffs[idx];
         }
       } else {
         for (var i=0,l=res.length; i<l; i++) if (grades[i]==grade) res[i]=this[i]; else res[i]=0;
@@ -306,9 +308,9 @@
     generator.prototype.Even = function(res) { 
       res=res||new this.constructor(); 
       if (this._sparse) {
-        for (var idx in this._coeffs) {
-          var i = parseInt(idx);
-          if (grades[i]%2==0) res[i]=this._coeffs[i];
+        for (let idx of Object.keys(this._coeffs)) {
+          let i = parseInt(idx);
+          if (grades[i]%2==0) res[i]=this._coeffs[idx];
         }
       } else {
         for (var i=0,l=res.length; i<l; i++) if (grades[i]%2==0) res[i]=this[i]; else res[i]=0;
@@ -348,7 +350,7 @@
       get(){ 
         var res = new this.constructor(); 
         if (this._sparse) {
-          for (let idx in this._coeffs) {
+          for (let idx of Object.keys(this._coeffs)) {
             res[parseInt(idx)] = -this._coeffs[idx];
           }
         } else {
@@ -361,7 +363,7 @@
       get(){ 
         var res = new this.constructor(); 
         if (this._sparse) {
-          for (let idx in this._coeffs) {
+          for (let idx of Object.keys(this._coeffs)) {
             let i = parseInt(idx);
             res[i]= this._coeffs[idx]*[1,1,-1,-1][grades[i]%4];
           }
@@ -375,7 +377,7 @@
       get(){ 
         var res = new this.constructor(); 
         if (this._sparse) {
-          for (let idx in this._coeffs) {
+          for (let idx of Object.keys(this._coeffs)) {
             let i = parseInt(idx);
             res[i]= this._coeffs[idx]*[1,-1,1,-1][grades[i]%4];
           }
@@ -389,7 +391,7 @@
       get(){ 
         var res = new this.constructor(); 
         if (this._sparse) {
-          for (let idx in this._coeffs) {
+          for (let idx of Object.keys(this._coeffs)) {
             let i = parseInt(idx);
             res[i]= this._coeffs[idx]*[1,-1,-1,1][grades[i]%4];
           }
@@ -414,7 +416,7 @@
       get(){ 
         var res = 0; 
         if (this._sparse) {
-          for (let idx in this._coeffs) {
+          for (let idx of Object.keys(this._coeffs)) {
             let val = this._coeffs[idx];
             res += val * val;
           }
@@ -436,7 +438,7 @@
           if (!l) return this; 
           l=1/l; 
           if (this._sparse) {
-            for (let idx in this._coeffs) {
+            for (let idx of Object.keys(this._coeffs)) {
               let i = parseInt(idx);
               if (options.over) {
                 res[i]=this._coeffs[idx].Scale(l);
