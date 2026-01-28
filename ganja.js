@@ -1764,6 +1764,9 @@
           return Element.graphGL(f, options);
         }
 
+        // Get tot from closure or calculate it
+        var tot = this.tot || basis.length;
+
         // Create container and canvas
         var container = document.createElement('div');
         container.style.width = options.width || '100%';
@@ -1875,7 +1878,7 @@
             return new THREE.MeshLambertMaterial(matOptions);
           } else { // phong (default)
             matOptions.shininess = opts.shininess !== undefined ? opts.shininess : (options.shininess || 30);
-            matOptions.specular = opts.specular || options.specular || 0x333333;
+            matOptions.specular = opts.specular !== undefined ? opts.specular : (options.specular !== undefined ? options.specular : 0x333333);
             return new THREE.MeshPhongMaterial(matOptions);
           }
         };
@@ -1884,14 +1887,19 @@
         var geometryGroups = [];
         var currentColor = 0x00ff00;
         
+        // Cache CGA basis vectors if in conformal mode
+        var ni, no;
+        if (options.conformal && tot == 5) {
+          ni = Element.Coeff(4,1).Add(Element.Coeff(5,1));
+          no = Element.Coeff(4,0.5).Sub(Element.Coeff(5,0.5));
+        }
+        
         // Helper to interpret geometric elements
         var interprete = function(e) {
           if (!(e instanceof Element)) return null;
           
           // For CGA, use proper interpretation
-          if (options.conformal && tot == 5) {
-            var ni = Element.Coeff(4,1).Add(Element.Coeff(5,1));
-            var no = Element.Coeff(4,0.5).Sub(Element.Coeff(5,0.5));
+          if (options.conformal && tot == 5 && ni && no) {
             var X2 = (e.Mul(e)).s;
             var epsilon = 0.000001 / (options.scale || 1);
             var opnix = ni.Wedge(e), ipnix = ni.LDot(e);
@@ -1924,13 +1932,16 @@
           }
           
           // Point (grade 3 in PGA3D)
-          if (e.e123) {
-            var pos = [
-              -e[13] / e[14] || 0,
-              e[12] / e[14] || 0,
-              e[11] / e[14] || 0
-            ];
-            return { type: 'point', pos: pos };
+          if (e.e123 && e.length >= 15) {
+            // Check for valid denominator to avoid division by zero
+            if (Math.abs(e[14]) > 0.0001) {
+              var pos = [
+                -e[13] / e[14],
+                e[12] / e[14],
+                e[11] / e[14]
+              ];
+              return { type: 'point', pos: pos };
+            }
           }
           
           // Line (grade 2)
@@ -1952,7 +1963,14 @@
           geometryGroups.forEach(group => {
             scene.remove(group);
             if (group.geometry) group.geometry.dispose();
-            if (group.material) group.material.dispose();
+            if (group.material) {
+              // Handle both single materials and material arrays
+              if (Array.isArray(group.material)) {
+                group.material.forEach(mat => mat.dispose());
+              } else {
+                group.material.dispose();
+              }
+            }
           });
           geometryGroups = [];
           
@@ -2038,7 +2056,7 @@
               }
               
               // Handle spheres (CGA)
-              if (interp && interp.type === 'sphere') {
+              if (interp && interp.type === 'sphere' && interp.radius > 0 && isFinite(interp.radius)) {
                 var sphereGeom = new THREE.SphereGeometry(
                   interp.radius,
                   options.sphereSegments || 32,
@@ -2058,7 +2076,7 @@
               }
               
               // Handle circles (CGA)
-              if (interp && interp.type === 'circle') {
+              if (interp && interp.type === 'circle' && interp.radius > 0.01 && isFinite(interp.radius)) {
                 var circleGeom = new THREE.RingGeometry(
                   interp.radius * 0.95,
                   interp.radius,
@@ -2093,9 +2111,19 @@
         };
         
         // Animation support
+        var animationFrameId = null;
         var animate = function() {
+          // Check if container is still in the DOM
+          if (!document.body.contains(container)) {
+            if (animationFrameId !== null) {
+              cancelAnimationFrame(animationFrameId);
+              animationFrameId = null;
+            }
+            return;
+          }
+          
           if (options.animate) {
-            requestAnimationFrame(animate);
+            animationFrameId = requestAnimationFrame(animate);
           }
           
           // Apply camera transformations
@@ -2106,7 +2134,7 @@
             camera.position.x = r * Math.cos(p) * Math.sin(h) + (options.posx || 0);
             camera.position.y = r * Math.sin(p) + (options.posy || 0);
             camera.position.z = r * Math.cos(p) * Math.cos(h) + (options.posz || 0);
-            camera.lookAt(options.posx || 0, options.posy || 0, options.posz || 0);
+            camera.lookAt(0, 0, 0);  // Always look at origin, not at offset position
           }
           
           // Custom animation callback
@@ -2169,16 +2197,41 @@
         }
         
         // Handle window resize
+        var resizeHandler = null;
         if (options.responsive !== false) {
-          window.addEventListener('resize', function() {
+          resizeHandler = function() {
             var newWidth = parseFloat(options.width) || container.clientWidth;
             var newHeight = parseFloat(options.height) || container.clientHeight;
             camera.aspect = newWidth / newHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(newWidth, newHeight);
             if (!options.animate) render();
-          });
+          };
+          window.addEventListener('resize', resizeHandler);
         }
+        
+        // Cleanup function
+        container.dispose = function() {
+          if (animationFrameId !== null) {
+            cancelAnimationFrame(animationFrameId);
+            animationFrameId = null;
+          }
+          if (resizeHandler) {
+            window.removeEventListener('resize', resizeHandler);
+          }
+          geometryGroups.forEach(group => {
+            scene.remove(group);
+            if (group.geometry) group.geometry.dispose();
+            if (group.material) {
+              if (Array.isArray(group.material)) {
+                group.material.forEach(mat => mat.dispose());
+              } else {
+                group.material.dispose();
+              }
+            }
+          });
+          renderer.dispose();
+        };
         
         // Initial render
         if (options.animate) {
