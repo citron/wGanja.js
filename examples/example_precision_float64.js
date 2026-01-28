@@ -53,7 +53,8 @@ function test1_iterativeAccumulation() {
   console.log(`  Expected:      ${expected.toExponential(10)}`);
   console.log(`  Float32Array:  ${result32.toExponential(10)} (error: ${error32.toExponential(3)})`);
   console.log(`  Float64Array:  ${result64.toExponential(10)} (error: ${error64.toExponential(3)})`);
-  console.log(`  ✓ Improvement: ${(error32 / error64).toFixed(0)}× more accurate\n`);
+  const improvement = error64 > 1e-20 ? (error32 / error64).toFixed(0) : 'perfect';
+  console.log(`  ✓ Improvement: ${improvement}${typeof improvement === 'string' ? '' : '×'} precision\n`);
 }
 
 /**
@@ -121,7 +122,8 @@ function test3_inverseAccuracy() {
   console.log(`  Configuration: Computing A × A⁻¹ and measuring deviation from identity`);
   console.log(`  Float32Array:  Total error = ${error32.toExponential(3)}`);
   console.log(`  Float64Array:  Total error = ${error64.toExponential(3)}`);
-  console.log(`  ✓ Improvement: ${(error32 / error64).toFixed(0)}× more accurate\n`);
+  const improvement = error64 > 1e-20 ? (error32 / error64).toFixed(0) : 'perfect';
+  console.log(`  ✓ Improvement: ${improvement}${typeof improvement === 'string' ? '' : '×'} precision\n`);
 }
 
 /**
@@ -168,7 +170,7 @@ function showUsageExamples() {
   console.log('═══════════════════════════════════════════════════════════\n');
   
   console.log('// Default: Float32Array (single precision)');
-  console.log('const PGA = Algebra(3, 0, 1);');
+  console.log('const PGA = Algebra({p:3, r:1});');
   console.log('const point = new PGA();');
   console.log('// point is instanceof Float32Array\n');
   
