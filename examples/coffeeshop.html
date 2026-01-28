@@ -4,7 +4,7 @@
 <!-- --------------------------------------- -->
 <HEAD>
   <!-- mobile -->
-  <meta name="viewport" content="width=device-width, initial-scale=0.5, maximum-scale=0.5, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
 
   <!-- Global site tag (gtag.js) - Google Analytics -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=UA-96802693-2"></script>
@@ -81,12 +81,171 @@
     .help tr:hover, .inspect tr:hover { background:#40464e; }
     .help td, .inspect td    { border:0px; padding-right:4px; white-space:nowrap; overflow:hidden; }
     .help td { text-align:center; padding-top:3px; }
-    @media only screen and (max-device-width: 600px) {
-      .left { width : 150px; }
-      .right { width : 100vw; }
+    /* Mobile hamburger menu button */
+    .mobile-menu-toggle {
+      display: none;
+      background: #FFFFFF;
+      color: #20262E;
+      padding: 10px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 20px;
+      line-height: 24px;
+      min-width: 44px;
+      min-height: 44px;
+      text-align: center;
+      border: 2px solid rgba(0,0,0,0);
+      transition: all 0.15s linear;
     }
-    @media only screen and (max-device-width: 1200px) {
-      .left { width : 150px; }
+    .mobile-menu-toggle:active {
+      background: #20262E;
+      color: #FFF;
+    }
+
+    /* Mobile optimizations for phones (< 768px) */
+    @media only screen and (max-width: 767px) {
+      /* Show hamburger menu */
+      .mobile-menu-toggle {
+        display: block;
+      }
+      
+      /* Stack layout vertically */
+      .content {
+        flex-direction: column;
+      }
+      
+      /* Sidebar: hidden by default on mobile, shown when toggled */
+      .left {
+        position: fixed;
+        top: 45px;
+        left: -100%;
+        width: 80%;
+        max-width: 300px;
+        height: calc(100vh - 45px);
+        z-index: 1000;
+        background: #20262E;
+        transition: left 0.3s ease;
+        box-shadow: 2px 0 5px rgba(0,0,0,0.5);
+      }
+      .left.mobile-open {
+        left: 0;
+      }
+      
+      /* Hide gutters on mobile */
+      .gutter {
+        display: none;
+      }
+      
+      /* Right panel (code editor) - hide by default, can be toggled */
+      .right {
+        position: fixed;
+        top: 45px;
+        right: -100%;
+        width: 100%;
+        height: calc(100vh - 45px);
+        z-index: 999;
+        background: #20262E;
+        transition: right 0.3s ease;
+      }
+      .right.mobile-open {
+        right: 0;
+      }
+      
+      /* Center content takes full width */
+      .center {
+        width: 100%;
+        flex-grow: 1;
+      }
+      
+      /* Header adjustments */
+      .header {
+        height: auto;
+        min-height: 45px;
+        flex-wrap: wrap;
+        padding: 5px;
+      }
+      .header h3 {
+        font-size: 16px;
+        margin: 0;
+        padding: 10px 5px;
+      }
+      
+      /* Larger touch targets for buttons */
+      .introButton {
+        padding: 12px 16px;
+        margin: 3px;
+        min-width: 44px;
+        min-height: 44px;
+        font-size: 14px;
+      }
+      
+      /* Tabs - larger touch targets */
+      .tabs {
+        height: auto;
+        flex-wrap: wrap;
+      }
+      .tab, .rtab {
+        line-height: 44px;
+        min-height: 44px;
+        padding: 0 15px;
+        font-size: 14px;
+      }
+      
+      /* Cards - larger and full width on mobile */
+      .card {
+        width: calc(50% - 15px);
+        height: 120px;
+        margin: 5px;
+        margin-bottom: 45px;
+      }
+      
+      /* Intro block - stack vertically */
+      .intro {
+        flex-direction: column;
+      }
+      .introBlock {
+        margin-right: 0;
+        margin-bottom: 15px;
+      }
+      
+      /* Sample groups - larger touch targets */
+      .sampleGroup {
+        padding: 12px 5px;
+        min-height: 44px;
+        line-height: 20px;
+      }
+    }
+    
+    /* Tablet optimizations (768px - 1024px) */
+    @media only screen and (min-width: 768px) and (max-width: 1024px) {
+      .left {
+        width: 250px;
+      }
+      .right {
+        width: 35vw;
+      }
+      
+      /* Larger touch targets */
+      .introButton {
+        padding: 10px 14px;
+        min-width: 44px;
+        min-height: 44px;
+      }
+      .tab, .rtab {
+        min-height: 40px;
+        line-height: 40px;
+      }
+      .card {
+        width: 140px;
+        height: 100px;
+      }
+    }
+    
+    /* Desktop and larger */
+    @media only screen and (min-width: 1025px) {
+      .mobile-menu-toggle {
+        display: none;
+      }
     }
     @keyframes ani {
       0%   { background:#FFFFFF }
@@ -146,10 +305,12 @@
     </DIV>
   </DIV>
   <DIV CLASS="header">
+    <DIV CLASS="mobile-menu-toggle" ID="menuToggle">&#9776;</DIV>
     <H3 STYLE="flex-grow:1" ID="title">The CoffeeShop</H3>
     <DIV CLASS="introButton" ID="new"><B>&plus;</B> New</DIV>
     <DIV CLASS="introButton" ID="save"><B>&bigstar;</B> Save</DIV>
     <DIV CLASS="introButton" ID="run"><B>&rtrif;</B> Run</DIV>
+    <DIV CLASS="mobile-menu-toggle" ID="codeToggle">&lt;/&gt;</DIV>
   </DIV>
   <DIV CLASS="content">
     <DIV CLASS="left">
@@ -308,7 +469,7 @@
   
   // Elements.
     var els={};
-    [".hider", "#inspectTable", "#inspectTable2", "#editJSON", "#copyJSON", ".inspect",".help","#stash", "#tab1", "#tab2", "#tab3", "#tab4","#run", "#title", "#titleInput", "#descriptionInput", "#urlInput", "#new","#fork","#save", "#properties", "#sample", ".left",".center",".right","#lgutter","#rgutter"].forEach(x=>els[x.replace(/[.#]/g,'')]=document.querySelector(x));
+    [".hider", "#inspectTable", "#inspectTable2", "#editJSON", "#copyJSON", ".inspect",".help","#stash", "#tab1", "#tab2", "#tab3", "#tab4","#run", "#title", "#titleInput", "#descriptionInput", "#urlInput", "#new","#fork","#save", "#properties", "#sample", ".left",".center",".right","#lgutter","#rgutter","#menuToggle","#codeToggle"].forEach(x=>els[x.replace(/[.#]/g,'')]=document.querySelector(x));
   
   // Ace editor.
     if (window.ace) {
@@ -541,6 +702,98 @@
     }
     els.lgutter.ondblclick = (e)=>{ els.left.style.width = els.left.style.minWidth = els.left.style.maxWidth = els.left.style.width=="0px" ? "":"0px"; postRun(); }
     els.rgutter.ondblclick = (e)=>{ els.right.style.width = els.right.style.minWidth = els.right.style.maxWidth = els.right.style.width=="0px" ? "":"0px"; postRun(); }
+  
+  // Add touch support for gutters (pointer events work for both mouse and touch)
+    els.lgutter.onpointerdown = (e)=>{
+      e.preventDefault(); e.stopPropagation(); els.center.style.pointerEvents = 'none'; els.left.style.overflow = 'hidden';
+      window.onpointermove = function(e) { els.left.style.width = els.left.style.minWidth = els.left.style.maxWidth =  Math.max(0,e.x-2)+"px"; postRun(); };
+      window.onpointerup = window.onpointercancel = function(e) { els.left.style.overflow=''; els.center.style.pointerEvents = 'all'; window.onpointerup = window.onpointercancel = window.onpointermove = undefined; };
+    }
+    els.rgutter.onpointerdown = (e)=>{
+      e.preventDefault(); e.stopPropagation(); els.center.style.pointerEvents = 'none';
+      window.onpointermove = function(e) { els.right.style.width = els.right.style.minWidth = (window.innerWidth-e.x-2)+"px"; postRun(); };
+      window.onpointerup = window.onpointercancel = function(e) { els.center.style.pointerEvents = 'all'; window.onpointerup = window.onpointercancel = window.onpointermove = undefined; };
+    }
+
+  // Mobile menu toggles
+    if (els.menuToggle) {
+      els.menuToggle.onclick = (e) => {
+        e.preventDefault();
+        els.left.classList.toggle('mobile-open');
+        // Close code panel if open
+        if (els.right.classList.contains('mobile-open')) {
+          els.right.classList.remove('mobile-open');
+        }
+      };
+    }
+    
+    if (els.codeToggle) {
+      els.codeToggle.onclick = (e) => {
+        e.preventDefault();
+        els.right.classList.toggle('mobile-open');
+        // Close menu if open
+        if (els.left.classList.contains('mobile-open')) {
+          els.left.classList.remove('mobile-open');
+        }
+      };
+    }
+    
+  // Close mobile panels when clicking on center content
+    if (els.center) {
+      els.center.onclick = (e) => {
+        if (window.innerWidth <= 767) {
+          if (els.left.classList.contains('mobile-open')) {
+            els.left.classList.remove('mobile-open');
+          }
+          if (els.right.classList.contains('mobile-open')) {
+            els.right.classList.remove('mobile-open');
+          }
+        }
+      };
+    }
+    
+  // Swipe gesture support for mobile
+    var touchStartX = 0;
+    var touchStartY = 0;
+    var touchEndX = 0;
+    var touchEndY = 0;
+    
+    document.body.addEventListener('touchstart', (e) => {
+      touchStartX = e.changedTouches[0].screenX;
+      touchStartY = e.changedTouches[0].screenY;
+    }, false);
+    
+    document.body.addEventListener('touchend', (e) => {
+      if (window.innerWidth > 767) return; // Only on mobile
+      
+      touchEndX = e.changedTouches[0].screenX;
+      touchEndY = e.changedTouches[0].screenY;
+      handleSwipeGesture();
+    }, false);
+    
+    function handleSwipeGesture() {
+      var xDiff = touchEndX - touchStartX;
+      var yDiff = touchEndY - touchStartY;
+      
+      // Horizontal swipe threshold
+      if (Math.abs(xDiff) > Math.abs(yDiff) && Math.abs(xDiff) > 50) {
+        if (xDiff > 0) {
+          // Swipe right - open left panel
+          if (!els.left.classList.contains('mobile-open') && touchStartX < 50) {
+            els.left.classList.add('mobile-open');
+            els.right.classList.remove('mobile-open');
+          }
+        } else {
+          // Swipe left - close left panel or open right panel
+          if (els.left.classList.contains('mobile-open')) {
+            els.left.classList.remove('mobile-open');
+          } else if (touchStartX > window.innerWidth - 50) {
+            els.right.classList.add('mobile-open');
+            els.left.classList.remove('mobile-open');
+          }
+        }
+      }
+    }
   
   // Link run handler.
     els.run.onclick=(e)=>{
