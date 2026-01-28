@@ -23,6 +23,7 @@ self.addEventListener('install', event => {
           .catch(err => {
             console.log('Service Worker: Cache failed for some resources', err);
             // Continue even if some resources fail to cache
+            return Promise.resolve();
           });
       })
       .then(() => self.skipWaiting())
@@ -47,6 +48,11 @@ self.addEventListener('activate', event => {
 
 // Fetch event - serve from cache, fallback to network
 self.addEventListener('fetch', event => {
+  // Only cache GET requests
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request)
       .then(response => {
@@ -60,7 +66,7 @@ self.addEventListener('fetch', event => {
 
         return fetch(fetchRequest).then(response => {
           // Check if we received a valid response
-          if (!response || response.status !== 200 || response.type !== 'basic') {
+          if (!response || response.status !== 200) {
             return response;
           }
 
@@ -71,6 +77,9 @@ self.addEventListener('fetch', event => {
           caches.open(CACHE_NAME)
             .then(cache => {
               cache.put(event.request, responseToCache);
+            })
+            .catch(err => {
+              console.log('Service Worker: Failed to cache resource', err);
             });
 
           return response;
