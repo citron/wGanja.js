@@ -2,7 +2,7 @@
 SHELL = /bin/bash
 
 ## Minimalistic, I'm using this on ubuntu, with g++ and mono default installs and node v11
-ALL: c hyperbolic dual r2 r3 mink quat r111 spacetime cga pga3d
+ALL: c hyperbolic dual r2 r3 mink quat r111 spacetime cga dcga3d pga3d
 	@echo "done !"
 
 ## Generate all languages by default

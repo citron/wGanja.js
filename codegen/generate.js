@@ -36,6 +36,7 @@ if (process.argv[2] && process.argv[2]!='PGA3D') {
   name = process.argv[2].toUpperCase();
   var known = {
     "CGA":[4,1,0],
+    "DCGA3D":[6,2,0],
     "MINK":[1,1,0],
     "R3":[3,0,0],
     "R2":[2,0,0],

@@ -137,6 +137,59 @@ if __name__ == '__main__':
 `
 })
 
+// python template for DCGA3D - Double Conformal Geometric Algebra
+var DCGA3D = (basis,classname)=>({
+preamble:`
+`,
+amble:`
+if __name__ == '__main__':
+    # Double Conformal GA - 6,2 metric for 3D space with dual conformal structure
+    e1 = ${classname}(1.0, 1)
+    e2 = ${classname}(1.0, 2)
+    e3 = ${classname}(1.0, 3)
+    ep1 = ${classname}(1.0, 4)
+    em1 = ${classname}(1.0, 5)
+    ep2 = ${classname}(1.0, 6)
+    em2 = ${classname}(1.0, 7)
+    
+    # Null basis - two conformal dimensions
+    no1 = 0.5 * (em1 - ep1)
+    ni1 = ep1 + em1
+    no2 = 0.5 * (em2 - ep2)
+    ni2 = ep2 + em2
+    no = no1 + no2
+    ni = ni1 + ni2
+    
+    # Upcast 3D point to DCGA point
+    def up(x, y, z):
+        d = x*x + y*y + z*z
+        return no + x*e1 + y*e2 + z*e3 + 0.5*d*ni
+    
+    # Create sphere at (x,y,z) with radius r
+    def sphere(x, y, z, r):
+        return up(x, y, z) - 0.5*r*r*ni
+    
+    # Oriented point - point with normal (uses second conformal dimension)
+    def oriented_point(x, y, z, nx, ny, nz):
+        p = up(x, y, z)
+        n = nx*e1 + ny*e2 + nz*e3
+        return p + n*ni2
+    
+    p1 = up(1.0, 0.0, 0.0)
+    p2 = up(0.0, 1.0, 0.0)
+    p3 = up(0.0, 0.0, 1.0)
+    s = sphere(0.5, 0.5, 0.5, 1.0)
+    op = oriented_point(1.0, 0.0, 0.0, 0.0, 1.0, 0.0)
+    
+    print("point p1      :", str(p1))
+    print("point p2      :", str(p2))
+    print("point p3      :", str(p3))
+    print("sphere        :", str(s))
+    print("oriented pt   :", str(op))
+    print("circle p1^p2^p3^ni :", str(p1^p2^p3^ni))
+`
+})
+
 // python template for PGA example
 var PGA3D = (basis,classname)=>({
 preamble:
@@ -238,4 +291,4 @@ var postamble = (basis,classname,example)=>
 ${example.amble}
 `;
 
-Object.assign(exports,{preamble,postamble,unary,binary,desc:"python",PGA3D,CGA,GENERIC});
+Object.assign(exports,{preamble,postamble,unary,binary,desc:"python",PGA3D,CGA,DCGA3D,GENERIC});
