@@ -156,7 +156,7 @@
     var simplify_bits = (A,B,p2)=>{ var n=p2||(p+q+r),t=0,ab=A&B,res=A^B; if (ab&((1<<r)-1)) return [0,0]; while (n--) t^=(A=A>>1); t&=B; t^=ab>>(p+r); t^=t>>16; t^=t>>8; t^=t>>4; return [1-2*(27030>>(t&15)&1),res]; },
         bc = (v)=>{ v=v-((v>>1)& 0x55555555); v=(v&0x33333333)+((v>>2)&0x33333333); var c=((v+(v>>4)&0xF0F0F0F)*0x1010101)>>24; return c };
 
-  if (!options.graded && tot <= 6 || options.graded===false || options.Cayley) {
+  if (!options.graded && tot <= 6 || options.graded===false || options.Cayley || options.sparse) {
   // Faster and degenerate-metric-resistant dualization. (a remapping table that maps items into their duals).
     var drm=basis.map((a,i)=>{ return {a:a,i:i} })
                  .sort((a,b)=>a.a.length>b.a.length?1:a.a.length<b.a.length?-1:(+a.a.slice(1).split('').sort().join(''))-(+b.a.slice(1).split('').sort().join('')) )
@@ -191,50 +191,268 @@
     });
 
   /// Flat Algebra Multivector Base Class.
-    var generator = class MultiVector extends (options.baseType||Float32Array) {
+    var generator = options.sparse ? class MultiVector {
+    /// constructor for sparse mode - use an object to store only non-zero coefficients
+      constructor(a) { 
+        this._coeffs = {}; 
+        this._sparse = true;
+        this.length = basis.length;
+        if (a && typeof a === 'number') {
+          // Initialize with size (all zeros in sparse mode means empty object)
+        } else if (a && typeof a === 'object') {
+          // Copy from another sparse or dense multivector
+          if (a._sparse) {
+            this._coeffs = {...a._coeffs};
+          } else {
+            for (let i = 0; i < (a.length || basis.length); i++) {
+              if (a[i] !== 0 && a[i] !== undefined) this._coeffs[i] = a[i];
+            }
+          }
+        }
+        // Setup proxy for array-like indexed access
+        return new Proxy(this, {
+          get(target, prop, receiver) {
+            // Handle numeric indices for coefficient access
+            if (typeof prop === 'string' && !isNaN(prop)) {
+              const idx = parseInt(prop);
+              return target._coeffs[idx] || 0;
+            }
+            // For all other properties, use normal access
+            const value = target[prop];
+            // If it's a function, bind it to the proxy
+            if (typeof value === 'function') {
+              return value.bind(receiver);
+            }
+            return value;
+          },
+          set(target, prop, value, receiver) {
+            // Handle numeric indices for coefficient setting
+            if (typeof prop === 'string' && !isNaN(prop)) {
+              const idx = parseInt(prop);
+              if (value === 0 || value === undefined) {
+                delete target._coeffs[idx];
+              } else {
+                target._coeffs[idx] = value;
+              }
+              return true;
+            }
+            // For all other properties, use normal setting
+            target[prop] = value;
+            return true;
+          }
+        });
+      }
+      
+      // Sparse helper: get non-zero indices
+      getNonZeroIndices() {
+        return Object.keys(this._coeffs).map(k => parseInt(k));
+      }
+      
+      // Sparse helper: iterate only over non-zero coefficients
+      forEachNonZero(fn) {
+        for (let idx in this._coeffs) {
+          fn(parseInt(idx), this._coeffs[idx]);
+        }
+      }
+      
+      // Array-like methods for compatibility
+      map(fn) {
+        const res = new this.constructor();
+        for (let i = 0; i < this.length; i++) {
+          const val = fn(this[i] || 0, i, this);
+          if (val !== 0) res[i] = val;
+        }
+        return res;
+      }
+      
+      slice(start, end) {
+        const result = [];
+        for (let i = start; i < (end || this.length); i++) {
+          result.push(this[i] || 0);
+        }
+        return result;
+      }
+      
+      set(arr, offset = 0) {
+        for (let i = 0; i < arr.length; i++) {
+          if (arr[i] !== 0 && arr[i] !== undefined) {
+            this[offset + i] = arr[i];
+          }
+        }
+      }
+    } : class MultiVector extends (options.baseType||Float32Array) {
     /// constructor - create a floating point array with the correct number of coefficients.
       constructor(a) { super(a||basis.length); return this; }
-
+    }
+    
+    /// Common methods for both sparse and dense multivectors
     /// grade selection - return a only the part of the input with the specified grade.
-      Grade(grade,res) { res=res||new this.constructor(); for (var i=0,l=res.length; i<l; i++) if (grades[i]==grade) res[i]=this[i]; else res[i]=0; return res; }
-      Even(res) { res=res||new this.constructor(); for (var i=0,l=res.length; i<l; i++) if (grades[i]%2==0) res[i]=this[i]; else res[i]=0; return res; }
+    generator.prototype.Grade = function(grade,res) { 
+      res=res||new this.constructor(); 
+      if (this._sparse) {
+        for (var idx in this._coeffs) {
+          var i = parseInt(idx);
+          if (grades[i]==grade) res[i]=this._coeffs[i];
+        }
+      } else {
+        for (var i=0,l=res.length; i<l; i++) if (grades[i]==grade) res[i]=this[i]; else res[i]=0;
+      }
+      return res; 
+    };
+    generator.prototype.Even = function(res) { 
+      res=res||new this.constructor(); 
+      if (this._sparse) {
+        for (var idx in this._coeffs) {
+          var i = parseInt(idx);
+          if (grades[i]%2==0) res[i]=this._coeffs[i];
+        }
+      } else {
+        for (var i=0,l=res.length; i<l; i++) if (grades[i]%2==0) res[i]=this[i]; else res[i]=0;
+      }
+      return res; 
+    };
 
     /// grade creation - convert array with just one grade to full multivector.
-      nVector(grade,...args) { this.set(args,grade_start[grade]); return this; }
+    generator.prototype.nVector = function(grade,...args) { 
+      if (this.set) this.set(args,grade_start[grade]); 
+      else for (var i=0; i<args.length; i++) this[grade_start[grade]+i] = args[i];
+      return this; 
+    };
 
     /// Fill in coordinates (accepts sequence of index,value as arguments)
-      Coeff() { for (var i=0,l=arguments.length; i<l; i+=2) this[arguments[i]]=arguments[i+1]; return this; }
+    generator.prototype.Coeff = function() { for (var i=0,l=arguments.length; i<l; i+=2) this[arguments[i]]=arguments[i+1]; return this; };
 
     /// Negates specific grades (passed in as args)
-      Map(res, ...a) { for (var i=0, l=res.length; i<l; i++) res[i] = (~a.indexOf(grades[i]))?-this[i]:this[i]; return res; }
+    generator.prototype.Map = function(res, ...a) { for (var i=0, l=res.length; i<l; i++) res[i] = (~a.indexOf(grades[i]))?-this[i]:this[i]; return res; };
 
     /// Returns the vector grade only.
-      get Vector ()    { return this.slice(grade_start[1],grade_start[2]); };
+    Object.defineProperty(generator.prototype, 'Vector', {
+      get() { return this.slice(grade_start[1],grade_start[2]); }
+    });
 
-      toString() { var res=[]; for (var i=0; i<basis.length; i++) if (Math.abs(this[i])>1e-10) res.push(((this[i]==1)&&i?'':((this[i]==-1)&&i)?'-':(this[i].toFixed(10)*1))+(i==0?'':tot==1&&q==1?'i':basis[i].replace('e','e_'))); return res.join('+').replace(/\+-/g,'-')||'0'; }
+    generator.prototype.toString = function() { 
+      var res=[]; 
+      for (var i=0; i<basis.length; i++) {
+        var val = this[i];
+        if (Math.abs(val)>1e-10) res.push(((val==1)&&i?'':((val==-1)&&i)?'-':(val.toFixed(10)*1))+(i==0?'':tot==1&&q==1?'i':basis[i].replace('e','e_')));
+      }
+      return res.join('+').replace(/\+-/g,'-')||'0'; 
+    };
 
-    /// Reversion, Involutions, Conjugation for any number of grades, component acces shortcuts.
-      get Negative (){ var res = new this.constructor(); for (var i=0; i<this.length; i++) res[i]= -this[i]; return res; };
-      get Reverse (){ var res = new this.constructor(); for (var i=0; i<this.length; i++) res[i]= this[i]*[1,1,-1,-1][grades[i]%4]; return res; };
-      get Involute (){ var res = new this.constructor(); for (var i=0; i<this.length; i++) res[i]= this[i]*[1,-1,1,-1][grades[i]%4]; return res; };
-      get Conjugate (){ var res = new this.constructor(); for (var i=0; i<this.length; i++) res[i]= this[i]*[1,-1,-1,1][grades[i]%4]; return res; };
+    /// Reversion, Involutions, Conjugation for any number of grades, component access shortcuts.
+    Object.defineProperty(generator.prototype, 'Negative', {
+      get(){ 
+        var res = new this.constructor(); 
+        if (this._sparse) {
+          for (let idx in this._coeffs) {
+            res[parseInt(idx)] = -this._coeffs[idx];
+          }
+        } else {
+          for (var i=0; i<this.length; i++) res[i]= -this[i];
+        }
+        return res; 
+      }
+    });
+    Object.defineProperty(generator.prototype, 'Reverse', {
+      get(){ 
+        var res = new this.constructor(); 
+        if (this._sparse) {
+          for (let idx in this._coeffs) {
+            let i = parseInt(idx);
+            res[i]= this._coeffs[idx]*[1,1,-1,-1][grades[i]%4];
+          }
+        } else {
+          for (var i=0; i<this.length; i++) res[i]= this[i]*[1,1,-1,-1][grades[i]%4];
+        }
+        return res; 
+      }
+    });
+    Object.defineProperty(generator.prototype, 'Involute', {
+      get(){ 
+        var res = new this.constructor(); 
+        if (this._sparse) {
+          for (let idx in this._coeffs) {
+            let i = parseInt(idx);
+            res[i]= this._coeffs[idx]*[1,-1,1,-1][grades[i]%4];
+          }
+        } else {
+          for (var i=0; i<this.length; i++) res[i]= this[i]*[1,-1,1,-1][grades[i]%4];
+        }
+        return res; 
+      }
+    });
+    Object.defineProperty(generator.prototype, 'Conjugate', {
+      get(){ 
+        var res = new this.constructor(); 
+        if (this._sparse) {
+          for (let idx in this._coeffs) {
+            let i = parseInt(idx);
+            res[i]= this._coeffs[idx]*[1,-1,-1,1][grades[i]%4];
+          }
+        } else {
+          for (var i=0; i<this.length; i++) res[i]= this[i]*[1,-1,-1,1][grades[i]%4];
+        }
+        return res; 
+      }
+    });
 
     /// The Dual, Length, non-metric length and normalized getters.
-      get Dual (){ if (r) return this.map((x,i,a)=>a[drm[i]]*drms[i]); var res = new this.constructor(); res[res.length-1]=1; return this.Mul(res); };
-      get UnDual (){ if (r) return this.map((x,i,a)=>a[drm[i]]*drms[a.length-i-1]); var res = new this.constructor(); res[res.length-1]=1; return this.Div(res); };
-      get Length (){ return options.over?Math.sqrt(Math.abs(this.Mul(this.Conjugate).s.s)):Math.sqrt(Math.abs(this.Mul(this.Conjugate).s)); };
-      get VLength (){ var res = 0; for (var i=0; i<this.length; i++) res += this[i]*this[i]; return Math.sqrt(res); };
-      get Normalized (){ 
+    Object.defineProperty(generator.prototype, 'Dual', {
+      get(){ if (r) return this.map((x,i,a)=>a[drm[i]]*drms[i]); var res = new this.constructor(); res[res.length-1]=1; return this.Mul(res); }
+    });
+    Object.defineProperty(generator.prototype, 'UnDual', {
+      get(){ if (r) return this.map((x,i,a)=>a[drm[i]]*drms[a.length-i-1]); var res = new this.constructor(); res[res.length-1]=1; return this.Div(res); }
+    });
+    Object.defineProperty(generator.prototype, 'Length', {
+      get(){ return options.over?Math.sqrt(Math.abs(this.Mul(this.Conjugate).s.s)):Math.sqrt(Math.abs(this.Mul(this.Conjugate).s)); }
+    });
+    Object.defineProperty(generator.prototype, 'VLength', {
+      get(){ 
+        var res = 0; 
+        if (this._sparse) {
+          for (let idx in this._coeffs) {
+            let val = this._coeffs[idx];
+            res += val * val;
+          }
+        } else {
+          for (var i=0; i<this.length; i++) res += this[i]*this[i];
+        }
+        return Math.sqrt(res); 
+      }
+    });
+    Object.defineProperty(generator.prototype, 'Normalized', {
+      get(){ 
         if (p==3 && r==1) {
           var sq = this.Mul(this.Reverse), [s,t] = [sq[0], sq[15]];
           if (s==0) return this;
           sq[0] = 1/Math.sqrt(s); sq[15] = -t/(2*Math.pow(Math.sqrt(s),3));
           return this.Mul(sq);
         } else {
-          var res = new this.constructor(), l=this.Length; if (!l) return this; l=1/l; for (var i=0; i<this.length; i++) if (options.over) {res[i]=this[i].Scale(l);} else {res[i]=this[i]*l}; return res; 
+          var res = new this.constructor(), l=this.Length; 
+          if (!l) return this; 
+          l=1/l; 
+          if (this._sparse) {
+            for (let idx in this._coeffs) {
+              let i = parseInt(idx);
+              if (options.over) {
+                res[i]=this._coeffs[idx].Scale(l);
+              } else {
+                res[i]=this._coeffs[idx]*l;
+              }
+            }
+          } else {
+            for (var i=0; i<this.length; i++) {
+              if (options.over) {
+                res[i]=this[i].Scale(l);
+              } else {
+                res[i]=this[i]*l;
+              }
+            }
+          }
+          return res; 
         }
-      };
-    }
+      }
+    });
 
   /// Convert symbolic matrices to code. (skipping zero's on dot and wedge matrices).
   /// These all do straightforward string fiddling. If the 'mix' option is set they reference basis components using e.g. '.e1' instead of eg '[3]' .. so that
