@@ -43,6 +43,12 @@ place for questions and support.
 
 ## New !
 
+### TypeScript Support
+
+ganja.js now includes **TypeScript support** with comprehensive type definitions for all algebra operations, improving IDE support, type safety, and maintainability. See [TYPESCRIPT.md](TYPESCRIPT.md) for details.
+
+### Code Generation
+
 ganja.js now has a nodejs based templated source generator that allows the creation of arbitrary algebras
 for **C++**, **C#**, **python** and **rust**. The generated code provides in a flat multivector format and operator overloading.
 Check the 'codegen' folder for the source, several algebras are available in pregenerated versions.
