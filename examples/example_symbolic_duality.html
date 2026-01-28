@@ -1,0 +1,117 @@
+<HEAD>
+  <SCRIPT SRC="../ganja.js"></SCRIPT>
+</HEAD>
+<BODY><SCRIPT>
+// Create a 3D Geometric Algebra with symbolic computation enabled
+Algebra({p:3, symbolic:true}, ()=>{ 
+
+  console.log("=== Symbolic Duality Operations in 3D Geometric Algebra ===\n");
+  
+  // Define symbolic vector
+  var vector = new Element();
+  vector[1] = "a";  // e1 component
+  vector[2] = "b";  // e2 component
+  vector[3] = "c";  // e3 component
+  
+  console.log("Vector v:");
+  console.log(vector.toString());
+  
+  // Compute the dual of the vector
+  // In 3D, the dual of a vector is a bivector
+  var dualVector = vector.Dual;
+  console.log("\nDual of vector (v*I where I=e123):");
+  console.log(dualVector.toString());
+  
+  // Define symbolic bivector
+  var bivector = new Element();
+  bivector[4] = "p";  // e12 component
+  bivector[5] = "q";  // e13 component
+  bivector[6] = "r";  // e23 component
+  
+  console.log("\nBivector B:");
+  console.log(bivector.toString());
+  
+  // Compute the dual of the bivector
+  // In 3D, the dual of a bivector is a vector
+  var dualBivector = bivector.Dual;
+  console.log("\nDual of bivector (B*I):");
+  console.log(dualBivector.toString());
+  
+  // Demonstrate that dual of dual returns to original (with sign)
+  var doubleDual = dualVector.Dual;
+  console.log("\nDouble dual of vector ((v*I)*I):");
+  console.log(doubleDual.toString());
+  console.log("Note: In 3D, (v*I)*I = -v (pseudoscalar squares to -1)");
+  
+  // Demonstrate wedge product and its dual
+  console.log("\n--- Wedge Product and Duality ---");
+  var v1 = new Element();
+  v1[1] = "x1";
+  v1[2] = "y1";
+  v1[3] = "z1";
+  
+  var v2 = new Element();
+  v2[1] = "x2";
+  v2[2] = "y2";
+  v2[3] = "z2";
+  
+  console.log("\nVector v1:");
+  console.log(v1.toString());
+  console.log("\nVector v2:");
+  console.log(v2.toString());
+  
+  // Wedge product creates a bivector
+  var wedge = v1.Wedge(v2);
+  console.log("\nWedge product (v1 ∧ v2):");
+  console.log(wedge.toString());
+  
+  // The dual of the wedge product
+  var dualWedge = wedge.Dual;
+  console.log("\nDual of wedge product ((v1 ∧ v2)*I):");
+  console.log(dualWedge.toString());
+  console.log("This represents the normal vector to the plane spanned by v1 and v2");
+  
+  // Simplify expressions
+  console.log("\n--- Simplification Example ---");
+  var simplified = wedge.Simplify();
+  console.log("Simplified wedge product:");
+  console.log(simplified.toString());
+  
+  // Display results in page
+  document.body.innerHTML = `
+    <h2>Symbolic Duality Operations in 3D Geometric Algebra</h2>
+    
+    <h3>Vector and Its Dual:</h3>
+    <p>Vector v = <code>${vector.toString()}</code></p>
+    <p>Dual(v) = v ∗ I = <code>${dualVector.toString()}</code></p>
+    <p><em>The dual of a vector in 3D is a bivector</em></p>
+    
+    <h3>Bivector and Its Dual:</h3>
+    <p>Bivector B = <code>${bivector.toString()}</code></p>
+    <p>Dual(B) = B ∗ I = <code>${dualBivector.toString()}</code></p>
+    <p><em>The dual of a bivector in 3D is a vector</em></p>
+    
+    <h3>Double Duality:</h3>
+    <p>Dual(Dual(v)) = <code>${doubleDual.toString()}</code></p>
+    <p><em>In 3D, the pseudoscalar I² = -1, so Dual(Dual(v)) = -v</em></p>
+    
+    <h3>Wedge Product Duality:</h3>
+    <p>v1 = <code>${v1.toString()}</code></p>
+    <p>v2 = <code>${v2.toString()}</code></p>
+    <p>v1 ∧ v2 = <code>${wedge.toString()}</code></p>
+    <p>Dual(v1 ∧ v2) = <code>${dualWedge.toString()}</code></p>
+    <p><em>The dual of the wedge product gives the normal vector to the plane</em></p>
+    
+    <h3>Applications:</h3>
+    <ul>
+      <li><strong>Theorem Proving:</strong> Symbolic operations allow verification of geometric identities</li>
+      <li><strong>Education:</strong> Clear algebraic expressions show how geometric operations work</li>
+      <li><strong>Code Generation:</strong> Symbolic forms can be optimized before numerical implementation</li>
+    </ul>
+    
+    <p><em>These symbolic computations preserve the algebraic structure without numerical evaluation,
+    making them ideal for theorem proving, education, and automated reasoning in geometric algebra.</em></p>
+  `;
+  
+});
+</SCRIPT></BODY>

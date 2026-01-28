@@ -119,6 +119,7 @@
       options.Cayley = [...Array(r+1)].map((a,i)=>[...Array(r+1)].map((y,j)=>i*j==0?((i+j)?'e0'+(i+j):'1'):'0'));
     }
     if (options.over) options.baseType = Array;
+    if (options.symbolic) options.baseType = Array;
 
   // Calculate the total number of dimensions.
     var tot = options.tot = (options.tot||(p||0)+(q||0)+(r||0)||(options.basis&&options.basis.length))|0;
@@ -211,16 +212,82 @@
     /// Returns the vector grade only.
       get Vector ()    { return this.slice(grade_start[1],grade_start[2]); };
 
-      toString() { var res=[]; for (var i=0; i<basis.length; i++) if (Math.abs(this[i])>1e-10) res.push(((this[i]==1)&&i?'':((this[i]==-1)&&i)?'-':(this[i].toFixed(10)*1))+(i==0?'':tot==1&&q==1?'i':basis[i].replace('e','e_'))); return res.join('+').replace(/\+-/g,'-')||'0'; }
+      toString() { 
+        var res=[]; 
+        for (var i=0; i<basis.length; i++) {
+          var coef = this[i];
+          if (typeof coef === "string") {
+            // Symbolic coefficient
+            if (coef && coef !== "0") {
+              res.push((coef==="1" && i ? '' : '('+coef+')')+(i==0?'':tot==1&&q==1?'i':basis[i].replace('e','e_')));
+            }
+          } else if (Math.abs(coef)>1e-10) {
+            // Numeric coefficient
+            res.push(((coef==1)&&i?'':((coef==-1)&&i)?'-':(coef.toFixed(10)*1))+(i==0?'':tot==1&&q==1?'i':basis[i].replace('e','e_')));
+          }
+        }
+        return res.join('+').replace(/\+-/g,'-')||'0'; 
+      }
 
     /// Reversion, Involutions, Conjugation for any number of grades, component acces shortcuts.
-      get Negative (){ var res = new this.constructor(); for (var i=0; i<this.length; i++) res[i]= -this[i]; return res; };
-      get Reverse (){ var res = new this.constructor(); for (var i=0; i<this.length; i++) res[i]= this[i]*[1,1,-1,-1][grades[i]%4]; return res; };
-      get Involute (){ var res = new this.constructor(); for (var i=0; i<this.length; i++) res[i]= this[i]*[1,-1,1,-1][grades[i]%4]; return res; };
-      get Conjugate (){ var res = new this.constructor(); for (var i=0; i<this.length; i++) res[i]= this[i]*[1,-1,-1,1][grades[i]%4]; return res; };
+      get Negative (){ 
+        var res = new this.constructor(); 
+        for (var i=0; i<this.length; i++) {
+          if (typeof this[i]=="string") res[i]= "-("+this[i]+")";
+          else res[i]= -this[i];
+        }
+        return res; 
+      };
+      get Reverse (){ 
+        var res = new this.constructor(); 
+        for (var i=0; i<this.length; i++) {
+          var coef = [1,1,-1,-1][grades[i]%4];
+          if (typeof this[i]=="string") {
+            if (coef === -1) res[i]= "-("+this[i]+")";
+            else res[i]= this[i];
+          } else res[i]= this[i]*coef;
+        }
+        return res; 
+      };
+      get Involute (){ 
+        var res = new this.constructor(); 
+        for (var i=0; i<this.length; i++) {
+          var coef = [1,-1,1,-1][grades[i]%4];
+          if (typeof this[i]=="string") {
+            if (coef === -1) res[i]= "-("+this[i]+")";
+            else res[i]= this[i];
+          } else res[i]= this[i]*coef;
+        }
+        return res; 
+      };
+      get Conjugate (){ 
+        var res = new this.constructor(); 
+        for (var i=0; i<this.length; i++) {
+          var coef = [1,-1,-1,1][grades[i]%4];
+          if (typeof this[i]=="string") {
+            if (coef === -1) res[i]= "-("+this[i]+")";
+            else res[i]= this[i];
+          } else res[i]= this[i]*coef;
+        }
+        return res; 
+      };
 
     /// The Dual, Length, non-metric length and normalized getters.
-      get Dual (){ if (r) return this.map((x,i,a)=>a[drm[i]]*drms[i]); var res = new this.constructor(); res[res.length-1]=1; return this.Mul(res); };
+      get Dual (){ 
+        if (r) {
+          var res = new this.constructor();
+          for (var i=0; i<this.length; i++) {
+            var val = this[drm[i]];
+            if (typeof val=="string") {
+              res[i] = drms[i] === -1 ? "-("+val+")" : val;
+            } else {
+              res[i] = val*drms[i];
+            }
+          }
+          return res;
+        }
+        var res = new this.constructor(); res[res.length-1]=1; return this.Mul(res); 
+      };
       get UnDual (){ if (r) return this.map((x,i,a)=>a[drm[i]]*drms[a.length-i-1]); var res = new this.constructor(); res[res.length-1]=1; return this.Div(res); };
       get Length (){ return options.over?Math.sqrt(Math.abs(this.Mul(this.Conjugate).s.s)):Math.sqrt(Math.abs(this.Mul(this.Conjugate).s)); };
       get VLength (){ var res = 0; for (var i=0; i<this.length; i++) res += this[i]*this[i]; return Math.sqrt(res); };
@@ -239,17 +306,213 @@
   /// Convert symbolic matrices to code. (skipping zero's on dot and wedge matrices).
   /// These all do straightforward string fiddling. If the 'mix' option is set they reference basis components using e.g. '.e1' instead of eg '[3]' .. so that
   /// it will work for elements of subalgebras etc.
-    generator.prototype.Add   = new Function('b,res','res=res||new this.constructor();\n'+basis.map((x,xi)=>'res['+xi+']=b['+xi+']+this['+xi+']').join(';\n').replace(/(b|this)\[(.*?)\]/g,(a,b,c)=>options.mix?'('+b+'.'+(c|0?basis[c]:'s')+'||0)':a)+';\nreturn res')
-    generator.prototype.Scale = new Function('b,res','res=res||new this.constructor();\n'+basis.map((x,xi)=>'res['+xi+']=b*this['+xi+']').join(';\n').replace(/(b|this)\[(.*?)\]/g,(a,b,c)=>options.mix?'('+b+'.'+(c|0?basis[c]:'s')+'||0)':a)+';\nreturn res')
-    generator.prototype.Sub   = new Function('b,res','res=res||new this.constructor();\n'+basis.map((x,xi)=>'res['+xi+']=this['+xi+']-b['+xi+']').join(';\n').replace(/(b|this)\[(.*?)\]/g,(a,b,c)=>options.mix?'('+b+'.'+(c|0?basis[c]:'s')+'||0)':a)+';\nreturn res')
-    generator.prototype.Mul   = new Function('b,res','res=res||new this.constructor();\n'+gp.map((r,ri)=>'res['+ri+']='+r.join('+').replace(/\+\-/g,'-').replace(/(\w*?)\[(.*?)\]/g,(a,b,c)=>options.mix?'('+b+'.'+(c|0?basis[c]:'s')+'||0)':a).replace(/\+0/g,'')+';').join('\n')+'\nreturn res;');
-    generator.prototype.LDot  = new Function('b,res','res=res||new this.constructor();\n'+cp.map((r,ri)=>'res['+ri+']='+r.join('+').replace(/\+\-/g,'-').replace(/\+0/g,'').replace(/(\w*?)\[(.*?)\]/g,(a,b,c)=>options.mix?'('+b+'.'+(c|0?basis[c]:'s')+'||0)':a)+';').join('\n')+'\nreturn res;');
-    generator.prototype.Dot   = new Function('b,res','res=res||new this.constructor();\n'+cps.map((r,ri)=>'res['+ri+']='+r.join('+').replace(/\+\-/g,'-').replace(/\+0/g,'').replace(/(\w*?)\[(.*?)\]/g,(a,b,c)=>options.mix?'('+b+'.'+(c|0?basis[c]:'s')+'||0)':a)+';').join('\n')+'\nreturn res;');
-    generator.prototype.Wedge = new Function('b,res','res=res||new this.constructor();\n'+op.map((r,ri)=>'res['+ri+']='+r.join('+').replace(/\+\-/g,'-').replace(/\+0/g,'').replace(/(\w*?)\[(.*?)\]/g,(a,b,c)=>options.mix?'('+b+'.'+(c|0?basis[c]:'s')+'||0)':a)+';').join('\n')+'\nreturn res;');
+  /// If the 'symbolic' option is set, operations handle string coefficients for symbolic manipulation.
+    if (options.symbolic) {
+      // Symbolic operations
+      generator.prototype.Add = function(b,res) {
+        res=res||new this.constructor();
+        for (var i=0; i<basis.length; i++) {
+          var a=this[i], bb=b[i];
+          if (typeof a=="string" || typeof bb=="string") {
+            if (!a || a===0) res[i] = ""+bb;
+            else if (!bb || bb===0) res[i] = ""+a;
+            else res[i]="("+(a||"0")+(bb.toString()[0]=="-"?"":"+")+bb+")";
+          } else res[i]=(a||0)+(bb||0);
+        }
+        return res;
+      };
+      generator.prototype.Sub = function(b,res) {
+        res=res||new this.constructor();
+        for (var i=0; i<basis.length; i++) {
+          var a=this[i], bb=b[i];
+          if (typeof a=="string" || typeof bb=="string") {
+            if (!a || a===0) res[i] = typeof bb=="string" ? "-"+bb : -bb;
+            else if (!bb || bb===0) res[i] = ""+a;
+            else res[i]="("+(a||"0")+"-"+bb+")";
+          } else res[i]=(a||0)-(bb||0);
+        }
+        return res;
+      };
+      generator.prototype.Scale = function(s,res) {
+        res=res||new this.constructor();
+        for (var i=0; i<basis.length; i++) {
+          var a=this[i];
+          if (typeof a=="string" || typeof s=="string") {
+            if (!a || a===0) res[i] = 0;
+            else if (s===1) res[i] = a;
+            else if (s===-1) res[i] = typeof a=="string" ? "-("+a+")" : -a;
+            else res[i]="("+a+")*("+s+")";
+          } else res[i]=(a||0)*s;
+        }
+        return res;
+      };
+      generator.prototype.Mul = function(b,res) {
+        res=res||new this.constructor();
+        for (var ri=0; ri<basis.length; ri++) {
+          var terms = [];
+          for (var xi=0; xi<basis.length; xi++) {
+            for (var yi=0; yi<basis.length; yi++) {
+              if (mulTable[xi][yi] === basis[ri] || mulTable[xi][yi] === '-'+basis[ri]) {
+                var a=this[xi], bb=b[yi];
+                if (a && bb) {
+                  var sign = mulTable[xi][yi][0]==='-' ? -1 : 1;
+                  if (typeof a=="string" || typeof bb=="string") {
+                    var term = "";
+                    if (sign===-1) term += "-";
+                    if (typeof a=="string" && a!=="1") term += "("+a+")";
+                    else if (typeof a=="number" && a!==1) term += a;
+                    else if (a===1 || a==="1") { if (!term) term = ""; }
+                    else term += a;
+                    
+                    if (term && term!=="-" && term!=="") term += "*";
+                    
+                    if (typeof bb=="string" && bb!=="1") term += "("+bb+")";
+                    else if (typeof bb=="number" && bb!==1) term += bb;
+                    else if (bb===1 || bb==="1") { if (!term || term==="-" || term==="" || term==="*") term = term.replace("*","")+(sign===-1?"-1":"1"); }
+                    else term += bb;
+                    
+                    term = term.replace(/\*$/,"");
+                    if (!term || term==="") term = "1";
+                    terms.push(term);
+                  } else {
+                    var val = sign*a*bb;
+                    if (val!==0) terms.push(val);
+                  }
+                }
+              }
+            }
+          }
+          if (terms.length>0) {
+            if (terms.some(t=>typeof t=="string")) {
+              res[ri] = terms.join("+").replace(/\+\-/g,"-").replace(/\(\+/g,'(');
+            } else {
+              res[ri] = terms.reduce((sum,t)=>sum+t,0);
+            }
+          } else {
+            res[ri] = 0;
+          }
+        }
+        return res;
+      };
+      generator.prototype.Wedge = function(b,res) {
+        res=res||new this.constructor();
+        for (var ri=0; ri<basis.length; ri++) {
+          var terms = [];
+          for (var xi=0; xi<basis.length; xi++) {
+            for (var yi=0; yi<basis.length; yi++) {
+              if ((mulTable[xi][yi] === basis[ri] || mulTable[xi][yi] === '-'+basis[ri]) && 
+                  grades[ri] === grades[xi]+grades[yi]) {
+                var a=this[xi], bb=b[yi];
+                if (a && bb) {
+                  var sign = mulTable[xi][yi][0]==='-' ? -1 : 1;
+                  if (typeof a=="string" || typeof bb=="string") {
+                    var term = "";
+                    if (sign===-1) term += "-";
+                    if (typeof a=="string" && a!=="1") term += "("+a+")";
+                    else if (typeof a=="number" && a!==1) term += a;
+                    else if (a===1 || a==="1") { if (!term) term = ""; }
+                    else term += a;
+                    
+                    if (term && term!=="-" && term!=="") term += "*";
+                    
+                    if (typeof bb=="string" && bb!=="1") term += "("+bb+")";
+                    else if (typeof bb=="number" && bb!==1) term += bb;
+                    else if (bb===1 || bb==="1") { if (!term || term==="-" || term==="" || term==="*") term = term.replace("*","")+(sign===-1?"-1":"1"); }
+                    else term += bb;
+                    
+                    term = term.replace(/\*$/,"");
+                    if (!term || term==="") term = "1";
+                    terms.push(term);
+                  } else {
+                    var val = sign*a*bb;
+                    if (val!==0) terms.push(val);
+                  }
+                }
+              }
+            }
+          }
+          if (terms.length>0) {
+            if (terms.some(t=>typeof t=="string")) {
+              res[ri] = terms.join("+").replace(/\+\-/g,"-").replace(/\(\+/g,'(');
+            } else {
+              res[ri] = terms.reduce((sum,t)=>sum+t,0);
+            }
+          } else {
+            res[ri] = 0;
+          }
+        }
+        return res;
+      };
+    } else {
+      // Numeric operations
+      generator.prototype.Add   = new Function('b,res','res=res||new this.constructor();\n'+basis.map((x,xi)=>'res['+xi+']=b['+xi+']+this['+xi+']').join(';\n').replace(/(b|this)\[(.*?)\]/g,(a,b,c)=>options.mix?'('+b+'.'+(c|0?basis[c]:'s')+'||0)':a)+';\nreturn res')
+      generator.prototype.Scale = new Function('b,res','res=res||new this.constructor();\n'+basis.map((x,xi)=>'res['+xi+']=b*this['+xi+']').join(';\n').replace(/(b|this)\[(.*?)\]/g,(a,b,c)=>options.mix?'('+b+'.'+(c|0?basis[c]:'s')+'||0)':a)+';\nreturn res')
+      generator.prototype.Sub   = new Function('b,res','res=res||new this.constructor();\n'+basis.map((x,xi)=>'res['+xi+']=this['+xi+']-b['+xi+']').join(';\n').replace(/(b|this)\[(.*?)\]/g,(a,b,c)=>options.mix?'('+b+'.'+(c|0?basis[c]:'s')+'||0)':a)+';\nreturn res')
+      generator.prototype.Mul   = new Function('b,res','res=res||new this.constructor();\n'+gp.map((r,ri)=>'res['+ri+']='+r.join('+').replace(/\+\-/g,'-').replace(/(\w*?)\[(.*?)\]/g,(a,b,c)=>options.mix?'('+b+'.'+(c|0?basis[c]:'s')+'||0)':a).replace(/\+0/g,'')+';').join('\n')+'\nreturn res;');
+      generator.prototype.LDot  = new Function('b,res','res=res||new this.constructor();\n'+cp.map((r,ri)=>'res['+ri+']='+r.join('+').replace(/\+\-/g,'-').replace(/\+0/g,'').replace(/(\w*?)\[(.*?)\]/g,(a,b,c)=>options.mix?'('+b+'.'+(c|0?basis[c]:'s')+'||0)':a)+';').join('\n')+'\nreturn res;');
+      generator.prototype.Dot   = new Function('b,res','res=res||new this.constructor();\n'+cps.map((r,ri)=>'res['+ri+']='+r.join('+').replace(/\+\-/g,'-').replace(/\+0/g,'').replace(/(\w*?)\[(.*?)\]/g,(a,b,c)=>options.mix?'('+b+'.'+(c|0?basis[c]:'s')+'||0)':a)+';').join('\n')+'\nreturn res;');
+      generator.prototype.Wedge = new Function('b,res','res=res||new this.constructor();\n'+op.map((r,ri)=>'res['+ri+']='+r.join('+').replace(/\+\-/g,'-').replace(/\+0/g,'').replace(/(\w*?)\[(.*?)\]/g,(a,b,c)=>options.mix?'('+b+'.'+(c|0?basis[c]:'s')+'||0)':a)+';').join('\n')+'\nreturn res;');
 //    generator.prototype.Vee   = new Function('b,res','res=res||new this.constructor();\n'+op.map((r,ri)=>'res['+drm[ri]+']='+r.map(x=>x.replace(/\[(.*?)\]/g,function(a,b){return '['+(drm[b|0])+']'})).join('+').replace(/\+\-/g,'-').replace(/\+0/g,'').replace(/(\w*?)\[(.*?)\]/g,(a,b,c)=>options.mix?'('+b+'.'+(c|0?basis[c]:'s')+'||0)':a)+';').join('\n')+'\nreturn res;');
   /// Conforms to the new Chapter 11 now.
-    generator.prototype.Vee   = new Function('b,res',('res=res||new this.constructor();\n'+op.map((r,ri)=>'res['+drm[ri]+']='+drms[ri]+'*('+r.map(x=>x.replace(/\[(.*?)\]/g,function(a,b){return '['+(drm[b|0])+']'+(drms[b|0]>0?"":"*-1")})).join('+').replace(/\+\-/g,'-').replace(/\+0/g,'').replace(/(\w*?)\[(.*?)\]/g,(a,b,c)=>options.mix?'('+b+'.'+(c|0?basis[c]:'s')+'||0)':a)+');').join('\n')+'\nreturn res;').replace(/(b\[)|(this\[)/g,a=>a=='b['?'this[':'b['));
+      generator.prototype.Vee   = new Function('b,res',('res=res||new this.constructor();\n'+op.map((r,ri)=>'res['+drm[ri]+']='+drms[ri]+'*('+r.map(x=>x.replace(/\[(.*?)\]/g,function(a,b){return '['+(drm[b|0])+']'+(drms[b|0]>0?"":"*-1")})).join('+').replace(/\+\-/g,'-').replace(/\+0/g,'').replace(/(\w*?)\[(.*?)\]/g,(a,b,c)=>options.mix?'('+b+'.'+(c|0?basis[c]:'s')+'||0)':a)+');').join('\n')+'\nreturn res;').replace(/(b\[)|(this\[)/g,a=>a=='b['?'this[':'b['));
+    }
     generator.prototype.eigenValues = eigenValues;
+
+  /// Symbolic manipulation methods
+    if (options.symbolic) {
+      // Simplify symbolic expressions
+      generator.prototype.Simplify = function() {
+        var res = new this.constructor();
+        for (var i=0; i<basis.length; i++) {
+          if (typeof this[i]=="string") {
+            var expr = this[i];
+            // Remove unnecessary parentheses and simplify basic patterns
+            expr = expr.replace(/\(\+/g,'(').replace(/\(0\)/g,'0').replace(/\(1\)/g,'1');
+            // Simplify double negatives
+            expr = expr.replace(/--/g,'+');
+            // Remove terms with 0
+            expr = expr.replace(/\+0\+/g,'+').replace(/\+0$/,'').replace(/^0\+/,'');
+            // Simplify 1* and *1
+            expr = expr.replace(/1\*/g,'').replace(/\*1(?!\d)/g,'');
+            // Remove outer parentheses if not necessary
+            if (expr.match(/^\(.*\)$/) && !expr.slice(1,-1).match(/^[^()]*[\+\-][^()]*$/)) {
+              expr = expr.slice(1,-1);
+            }
+            res[i] = expr||0;
+          } else {
+            res[i] = this[i];
+          }
+        }
+        return res;
+      };
+      
+      // Expand symbolic expressions (distribute multiplication)
+      generator.prototype.Expand = function() {
+        var res = new this.constructor();
+        for (var i=0; i<basis.length; i++) {
+          if (typeof this[i]=="string") {
+            var expr = this[i];
+            // Basic expansion: (a+b)*c -> a*c+b*c
+            // This is a simplified version - full expansion would require a proper parser
+            expr = expr.replace(/\(([^\(\)]+)\)\*\(([^\(\)]+)\)/g, function(match, p1, p2) {
+              var terms1 = p1.split(/(?=[+-])/).filter(t=>t);
+              var terms2 = p2.split(/(?=[+-])/).filter(t=>t);
+              var result = [];
+              for (var t1 of terms1) {
+                for (var t2 of terms2) {
+                  result.push('('+t1.replace(/^[+]/,'')+'*'+t2.replace(/^[+]/,'')+')');
+                }
+              }
+              return result.join('+');
+            });
+            res[i] = expr;
+          } else {
+            res[i] = this[i];
+          }
+        }
+        return res;
+      };
+    }
 
   /// Add getter and setters for the basis vectors/bivectors etc ..
     basis.forEach((b,i)=>Object.defineProperty(generator.prototype, i?b:'s', {
