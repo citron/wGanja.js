@@ -811,6 +811,7 @@
           return (tot==4 && o instanceof Element && o.length==16)?(tpcam).Vee(options.camera.Mul(o).Mul(options.camera.Conjugate)).Wedge(tpy):(o.length==2**tot)?Element.sw(options.camera,o):o;
         };
       // gl escape.
+        if (options.useThree) return Element.graphGL3JS(f,options);
         if (options.gl && !(tot==4 && options.conformal)) return Element.graphGL(f,options); if (options.up) return Element.graphGL2(f,options);
       // if we get an array or function without parameters, we render c2d or p2d SVG points/lines/circles/etc
         if (!(f instanceof Function) || f.length===0) {
@@ -1753,6 +1754,505 @@
         if (options&&options.still) {
           var i=new Image(); canvas.im = i; return requestAnimationFrame(canvas.update.bind(canvas,f,options)),canvas;
         } else return requestAnimationFrame(canvas.update.bind(canvas,f,options)),canvas;
+      }
+
+    // Three.js WebGL Graphing function for enhanced 3D rendering
+      static graphGL3JS(f, options) {
+        // Check if Three.js is available
+        if (typeof THREE === 'undefined') {
+          console.warn('Three.js not available, falling back to standard WebGL renderer');
+          return Element.graphGL(f, options);
+        }
+
+        // Get tot from closure or calculate it
+        var tot = this.tot || basis.length;
+
+        // Create container and canvas
+        var container = document.createElement('div');
+        container.style.width = options.width || '100%';
+        container.style.height = options.height || '100%';
+        container.style.position = 'relative';
+        
+        var canvas = document.createElement('canvas');
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+        container.appendChild(canvas);
+
+        // Parse dimensions
+        var width = parseFloat(options.width) || 800;
+        var height = parseFloat(options.height) || 600;
+        
+        // Setup Three.js scene, camera, renderer
+        var scene = new THREE.Scene();
+        scene.background = new THREE.Color(options.backgroundColor || 0xf0f0f0);
+        
+        var camera = new THREE.PerspectiveCamera(
+          options.fov || 75,
+          width / height,
+          options.near || 0.1,
+          options.far || 1000
+        );
+        camera.position.z = options.z || 5;
+        camera.position.x = options.posx || 0;
+        camera.position.y = options.posy || 0;
+        
+        var renderer = new THREE.WebGLRenderer({ 
+          canvas: canvas,
+          antialias: options.antialias !== false,
+          alpha: options.alpha || false
+        });
+        renderer.setSize(width, height);
+        renderer.setPixelRatio(window.devicePixelRatio || 1);
+        if (options.shadowMap !== false) {
+          renderer.shadowMap.enabled = true;
+          renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        }
+        
+        // Setup lighting
+        if (options.lights !== false) {
+          // Ambient light
+          var ambientLight = new THREE.AmbientLight(
+            options.ambientColor || 0xffffff,
+            options.ambientIntensity || 0.4
+          );
+          scene.add(ambientLight);
+          
+          // Directional light
+          var dirLight = new THREE.DirectionalLight(
+            options.directionalColor || 0xffffff,
+            options.directionalIntensity || 0.6
+          );
+          dirLight.position.set(2, 2, -4);
+          if (options.shadowMap !== false) {
+            dirLight.castShadow = true;
+            dirLight.shadow.camera.near = 0.1;
+            dirLight.shadow.camera.far = 50;
+          }
+          scene.add(dirLight);
+          
+          // Optional point light
+          if (options.pointLight) {
+            var pointLight = new THREE.PointLight(
+              options.pointLightColor || 0xffffff,
+              options.pointLightIntensity || 0.5
+            );
+            pointLight.position.set(
+              options.pointLightX || 0,
+              options.pointLightY || 5,
+              options.pointLightZ || 0
+            );
+            if (options.shadowMap !== false) pointLight.castShadow = true;
+            scene.add(pointLight);
+          }
+        }
+        
+        // Grid helper
+        if (options.grid) {
+          var gridSize = options.gridSize || 10;
+          var gridDivisions = options.gridDivisions || 10;
+          var gridHelper = new THREE.GridHelper(
+            gridSize,
+            gridDivisions,
+            options.gridColorCenter || 0x888888,
+            options.gridColorGrid || 0xcccccc
+          );
+          scene.add(gridHelper);
+        }
+        
+        // Material factory
+        var createMaterial = function(color, opts) {
+          opts = opts || {};
+          var materialType = opts.materialType || options.materialType || 'phong';
+          var matOptions = {
+            color: color,
+            side: opts.doubleSided || options.doubleSided ? THREE.DoubleSide : THREE.FrontSide
+          };
+          
+          if (materialType === 'standard') {
+            matOptions.metalness = opts.metalness !== undefined ? opts.metalness : (options.metalness || 0.1);
+            matOptions.roughness = opts.roughness !== undefined ? opts.roughness : (options.roughness || 0.5);
+            return new THREE.MeshStandardMaterial(matOptions);
+          } else if (materialType === 'basic') {
+            return new THREE.MeshBasicMaterial(matOptions);
+          } else if (materialType === 'lambert') {
+            return new THREE.MeshLambertMaterial(matOptions);
+          } else { // phong (default)
+            matOptions.shininess = opts.shininess !== undefined ? opts.shininess : (options.shininess || 30);
+            matOptions.specular = opts.specular !== undefined ? opts.specular : (options.specular !== undefined ? options.specular : 0x333333);
+            return new THREE.MeshPhongMaterial(matOptions);
+          }
+        };
+        
+        // Geometry groups for batching
+        var geometryGroups = [];
+        var currentColor = 0x00ff00;
+        
+        // Cache CGA basis vectors if in conformal mode
+        var ni, no;
+        if (options.conformal && tot == 5) {
+          ni = Element.Coeff(4,1).Add(Element.Coeff(5,1));
+          no = Element.Coeff(4,0.5).Sub(Element.Coeff(5,0.5));
+        }
+        
+        // Helper to interpret geometric elements
+        var interprete = function(e) {
+          if (!(e instanceof Element)) return null;
+          
+          // For CGA, use proper interpretation
+          if (options.conformal && tot == 5 && ni && no) {
+            var X2 = (e.Mul(e)).s;
+            var epsilon = 0.000001 / (options.scale || 1);
+            var opnix = ni.Wedge(e), ipnix = ni.LDot(e);
+            var opnixzero = opnix.VLength < epsilon, ipnixzero = ipnix.VLength < epsilon;
+            var x2zero = Math.abs(X2) < epsilon;
+            
+            // Bound vec,biv,tri (points)
+            if (x2zero && !opnixzero && !ipnixzero) {
+              var pos = [...(Element.LDot(1/(ni.LDot(e)).s, e)).slice(1,4)].map(x => -x * (options.scale || 1));
+              return { type: 'point', pos: pos };
+            }
+            
+            // Sphere
+            if (!x2zero && e.Grade(1).VLength) {
+              var nix = ni.Wedge(e), nix2 = (nix.Mul(nix)).s;
+              var pos = [...(e.Mul(ni).Mul(e)).slice(1,4)].map(x => -x / (2.0 * nix2) * (options.scale || 1));
+              var weight2 = Math.abs((e.LDot(e)).s / nix2) ** 0.5 * (options.scale || 1);
+              return { type: 'sphere', pos: pos, radius: weight2 };
+            }
+            
+            // Circle
+            if (!x2zero && e.Grade(3).VLength) {
+              var nix = ni.Wedge(e), nix2 = (nix.Mul(nix)).s;
+              var pos = [...(e.Mul(ni).Mul(e)).slice(1,4)].map(x => -x / (2.0 * nix2) * (options.scale || 1));
+              var weight2 = Math.abs((e.LDot(e)).s / nix2) ** 0.5 * (options.scale || 1);
+              return { type: 'circle', pos: pos, radius: weight2 };
+            }
+            
+            return null;
+          }
+          
+          // Point (grade 3 in PGA3D)
+          if (e.e123 && e.length >= 15) {
+            // Check for valid denominator to avoid division by zero
+            if (Math.abs(e[14]) > 0.0001) {
+              var pos = [
+                -e[13] / e[14],
+                e[12] / e[14],
+                e[11] / e[14]
+              ];
+              return { type: 'point', pos: pos };
+            }
+          }
+          
+          // Line (grade 2)
+          if (e.Grade(2).Length > 0.001) {
+            return { type: 'line', element: e };
+          }
+          
+          // Plane (grade 1)
+          if (e.Grade(1).Length > 0.001) {
+            return { type: 'plane', element: e };
+          }
+          
+          return null;
+        };
+        
+        // Render function
+        var render = function() {
+          // Clear previous geometry
+          geometryGroups.forEach(group => {
+            scene.remove(group);
+            if (group.geometry) group.geometry.dispose();
+            if (group.material) {
+              // Handle both single materials and material arrays
+              if (Array.isArray(group.material)) {
+                group.material.forEach(mat => mat.dispose());
+              } else {
+                group.material.dispose();
+              }
+            }
+          });
+          geometryGroups = [];
+          
+          // Get data
+          var data = f.call ? f() : f;
+          if (!Array.isArray(data)) data = [data];
+          
+          // Process elements
+          for (var i = 0; i < data.length; i++) {
+            var e = data[i];
+            
+            // Color
+            if (typeof e === 'number') {
+              currentColor = e & 0xffffff;
+              continue;
+            }
+            
+            // String labels
+            if (typeof e === 'string') {
+              // TODO: Add sprite-based text labels
+              continue;
+            }
+            
+            // Array of points (polygon/line)
+            if (e instanceof Array) {
+              if (e.length >= 2 && e[0] instanceof Element) {
+                var points = e.map(pt => {
+                  var interp = interprete(pt);
+                  if (interp && interp.type === 'point') {
+                    return new THREE.Vector3(...interp.pos);
+                  }
+                  return null;
+                }).filter(p => p !== null);
+                
+                if (points.length >= 2) {
+                  // Create line
+                  var lineGeom = new THREE.BufferGeometry().setFromPoints(points);
+                  var lineMat = new THREE.LineBasicMaterial({ 
+                    color: currentColor,
+                    linewidth: options.lineWidth || 1
+                  });
+                  var line = new THREE.Line(lineGeom, lineMat);
+                  scene.add(line);
+                  geometryGroups.push(line);
+                }
+                
+                if (points.length >= 3 && e.length % 3 === 0) {
+                  // Create mesh from triangles
+                  var meshGeom = new THREE.BufferGeometry().setFromPoints(points);
+                  meshGeom.computeVertexNormals();
+                  var meshMat = createMaterial(currentColor);
+                  var mesh = new THREE.Mesh(meshGeom, meshMat);
+                  if (options.shadowMap !== false) {
+                    mesh.castShadow = true;
+                    mesh.receiveShadow = true;
+                  }
+                  scene.add(mesh);
+                  geometryGroups.push(mesh);
+                }
+              }
+              continue;
+            }
+            
+            // Individual geometric element
+            if (e instanceof Element) {
+              var interp = interprete(e);
+              
+              if (interp && interp.type === 'point') {
+                var pointGeom = new THREE.SphereGeometry(
+                  options.pointRadius || 0.05,
+                  options.pointSegments || 16,
+                  options.pointSegments || 16
+                );
+                var pointMat = createMaterial(currentColor);
+                var point = new THREE.Mesh(pointGeom, pointMat);
+                point.position.set(...interp.pos);
+                if (options.shadowMap !== false) {
+                  point.castShadow = true;
+                  point.receiveShadow = true;
+                }
+                scene.add(point);
+                geometryGroups.push(point);
+              }
+              
+              // Handle spheres (CGA)
+              if (interp && interp.type === 'sphere' && interp.radius > 0 && isFinite(interp.radius)) {
+                var sphereGeom = new THREE.SphereGeometry(
+                  interp.radius,
+                  options.sphereSegments || 32,
+                  options.sphereSegments || 32
+                );
+                var sphereMat = createMaterial(currentColor);
+                sphereMat.opacity = options.sphereOpacity || 0.7;
+                sphereMat.transparent = true;
+                var sphere = new THREE.Mesh(sphereGeom, sphereMat);
+                sphere.position.set(...interp.pos);
+                if (options.shadowMap !== false) {
+                  sphere.castShadow = true;
+                  sphere.receiveShadow = true;
+                }
+                scene.add(sphere);
+                geometryGroups.push(sphere);
+              }
+              
+              // Handle circles (CGA)
+              if (interp && interp.type === 'circle' && interp.radius > 0.01 && isFinite(interp.radius)) {
+                var circleGeom = new THREE.RingGeometry(
+                  interp.radius * 0.95,
+                  interp.radius,
+                  options.circleSegments || 64
+                );
+                var circleMat = createMaterial(currentColor, { doubleSided: true });
+                var circle = new THREE.Mesh(circleGeom, circleMat);
+                circle.position.set(...interp.pos);
+                scene.add(circle);
+                geometryGroups.push(circle);
+              }
+              
+              // Handle planes as quads
+              if (interp && interp.type === 'plane') {
+                var planeSize = e.Length || 1;
+                var planeGeom = new THREE.PlaneGeometry(planeSize, planeSize);
+                var planeMat = createMaterial(currentColor, { doubleSided: true });
+                planeMat.opacity = options.planeOpacity || 0.5;
+                planeMat.transparent = true;
+                var plane = new THREE.Mesh(planeGeom, planeMat);
+                // TODO: Orient plane based on normal
+                if (options.shadowMap !== false) {
+                  plane.receiveShadow = true;
+                }
+                scene.add(plane);
+                geometryGroups.push(plane);
+              }
+            }
+          }
+          
+          renderer.render(scene, camera);
+        };
+        
+        // Animation support
+        var animationFrameId = null;
+        var animate = function() {
+          // Check if container is still in the DOM
+          if (!document.body.contains(container)) {
+            if (animationFrameId !== null) {
+              cancelAnimationFrame(animationFrameId);
+              animationFrameId = null;
+            }
+            return;
+          }
+          
+          if (options.animate) {
+            animationFrameId = requestAnimationFrame(animate);
+          }
+          
+          // Apply camera transformations
+          if (options.h !== undefined || options.p !== undefined) {
+            var h = options.h || 0;
+            var p = options.p || 0;
+            var r = options.z || 5;
+            camera.position.x = r * Math.cos(p) * Math.sin(h) + (options.posx || 0);
+            camera.position.y = r * Math.sin(p) + (options.posy || 0);
+            camera.position.z = r * Math.cos(p) * Math.cos(h) + (options.posz || 0);
+            camera.lookAt(0, 0, 0);  // Always look at origin, not at offset position
+          }
+          
+          // Custom animation callback
+          if (options.onAnimate) {
+            options.onAnimate(scene, camera, renderer);
+          }
+          
+          render();
+        };
+        
+        // Mouse controls
+        if (options.controls !== false) {
+          var mouseDown = false;
+          var mouseButton = 0;
+          var lastMouseX = 0;
+          var lastMouseY = 0;
+          
+          canvas.addEventListener('mousedown', function(e) {
+            mouseDown = true;
+            mouseButton = e.button;
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+            e.preventDefault();
+          });
+          
+          canvas.addEventListener('mouseup', function(e) {
+            mouseDown = false;
+          });
+          
+          canvas.addEventListener('mousemove', function(e) {
+            if (!mouseDown) return;
+            
+            var dx = e.clientX - lastMouseX;
+            var dy = e.clientY - lastMouseY;
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+            
+            if (mouseButton === 0) { // Left button - rotate
+              options.h = (options.h || 0) + dx * 0.005;
+              options.p = Math.max(-Math.PI/2, Math.min(Math.PI/2, (options.p || 0) - dy * 0.005));
+            } else if (mouseButton === 2) { // Right button - pan
+              var factor = 0.01;
+              options.posx = (options.posx || 0) + dx * factor;
+              options.posy = (options.posy || 0) - dy * factor;
+            }
+            
+            if (!options.animate) render();
+            e.preventDefault();
+          });
+          
+          canvas.addEventListener('wheel', function(e) {
+            options.z = Math.max(0.1, (options.z || 5) + e.deltaY * 0.01);
+            if (!options.animate) render();
+            e.preventDefault();
+          });
+          
+          canvas.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+          });
+        }
+        
+        // Handle window resize
+        var resizeHandler = null;
+        if (options.responsive !== false) {
+          resizeHandler = function() {
+            var newWidth = parseFloat(options.width) || container.clientWidth;
+            var newHeight = parseFloat(options.height) || container.clientHeight;
+            camera.aspect = newWidth / newHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(newWidth, newHeight);
+            if (!options.animate) render();
+          };
+          window.addEventListener('resize', resizeHandler);
+        }
+        
+        // Cleanup function
+        container.dispose = function() {
+          if (animationFrameId !== null) {
+            cancelAnimationFrame(animationFrameId);
+            animationFrameId = null;
+          }
+          if (resizeHandler) {
+            window.removeEventListener('resize', resizeHandler);
+          }
+          geometryGroups.forEach(group => {
+            scene.remove(group);
+            if (group.geometry) group.geometry.dispose();
+            if (group.material) {
+              if (Array.isArray(group.material)) {
+                group.material.forEach(mat => mat.dispose());
+              } else {
+                group.material.dispose();
+              }
+            }
+          });
+          renderer.dispose();
+        };
+        
+        // Initial render
+        if (options.animate) {
+          animate();
+        } else {
+          render();
+        }
+        
+        // Store reference for updates
+        container.update = function(newF, newOptions) {
+          if (newF) f = newF;
+          if (newOptions) Object.assign(options, newOptions);
+          render();
+        };
+        
+        container.scene = scene;
+        container.camera = camera;
+        container.renderer = renderer;
+        container.canvas = canvas;
+        
+        return container;
       }
 
     // The inline function is a js to js translator that adds operator overloading and algebraic literals.

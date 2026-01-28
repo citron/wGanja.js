@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+<HEAD>
+  <meta charset="utf-8">
+  <title>Three.js CGA3D Animated Scene Example</title>
+  <SCRIPT SRC="../node_modules/three/build/three.min.js"></SCRIPT>
+  <SCRIPT SRC="../ganja.js"></SCRIPT>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+    }
+    .description {
+      margin-bottom: 20px;
+      color: #666;
+      max-width: 800px;
+    }
+    #canvas-container {
+      width: 800px;
+      height: 600px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+  </style>
+</HEAD>
+<BODY>
+  <h1>Three.js Enhanced Visualization - CGA3D Animated Scene</h1>
+  <div class="description">
+    This example demonstrates Three.js integration with Conformal Geometric Algebra (CGA).
+    The scene features orbiting points with custom materials, multiple light sources,
+    and real-time animations. Use your mouse to rotate the camera and scroll to zoom.
+  </div>
+  <div id="canvas-container"></div>
+  
+  <SCRIPT>
+    // Create a Clifford Algebra with 4,1 metric for 3D CGA
+    Algebra(4, 1, () => {
+      
+      // Null basis and point definition for CGA
+      var ni = 1e4 + 1e5;
+      var no = 0.5*1e4 - 0.5*1e5;
+      var up = (x) => x + 0.5*x*x*ni - no;
+      
+      // Create point from 3D coordinates
+      var point3d = (x, y, z) => up(x*1e1 + y*1e2 + z*1e3);
+      
+      // Origin and basis points for reference
+      var origin = up(0);
+      var basisI = up(1e1);
+      var basisJ = up(1e2);
+      var basisK = up(1e3);
+      
+      var container = document.getElementById('canvas-container');
+      container.appendChild(this.graph(() => {
+        // Animation time
+        var t = performance.now() / 1000;
+        
+        // Create animated orbiting points
+        var orbitRadius1 = 1.0;
+        var orbitRadius2 = 0.7;
+        var orbitRadius3 = 1.3;
+        
+        // Points orbiting in different planes
+        var p1 = point3d(
+          orbitRadius1 * Math.cos(t),
+          orbitRadius1 * Math.sin(t),
+          0
+        );
+        
+        var p2 = point3d(
+          orbitRadius2 * Math.cos(t * 1.5),
+          0,
+          orbitRadius2 * Math.sin(t * 1.5)
+        );
+        
+        var p3 = point3d(
+          0,
+          orbitRadius3 * Math.cos(t * 0.8),
+          orbitRadius3 * Math.sin(t * 0.8)
+        );
+        
+        // Create some spiral points
+        var spiralPoints = [];
+        var numSpiralPoints = 12;
+        for (var i = 0; i < numSpiralPoints; i++) {
+          var angle = (t + i / numSpiralPoints * Math.PI * 2);
+          var radius = 0.5 + 0.3 * Math.sin(t + i * 0.5);
+          var height = Math.sin(t + i * 0.3) * 0.5;
+          spiralPoints.push(point3d(
+            radius * Math.cos(angle),
+            height,
+            radius * Math.sin(angle)
+          ));
+        }
+        
+        // Create a pulsing central sphere
+        var centerScale = 0.3 + 0.1 * Math.sin(t * 3);
+        var centerPoint = point3d(0, 0, 0);
+        
+        // Build the scene
+        var scene = [
+          "CGA 3D Animated Scene with Three.js",
+          
+          // Reference basis points (static)
+          0xff0000, basisI, "X",
+          0x00ff00, basisJ, "Y",
+          0x0000ff, basisK, "Z",
+          0x888888, origin, "O",
+          
+          // Main orbiting points
+          0xff8800, p1,
+          0x00ff88, p2,
+          0x8800ff, p3,
+          
+          // Spiral points in gradient colors
+        ];
+        
+        // Add spiral points with color gradient
+        for (var i = 0; i < spiralPoints.length; i++) {
+          var hue = (i / numSpiralPoints) * 360;
+          var color = hslToRgb(hue, 70, 60);
+          scene.push(color, spiralPoints[i]);
+        }
+        
+        // Add connecting lines for orbits
+        scene.push(
+          0xcccccc,
+          [origin, p1],
+          [origin, p2],
+          [origin, p3]
+        );
+        
+        return scene;
+      }, {
+        useThree: true,              // Enable Three.js renderer
+        conformal: true,              // CGA mode
+        animate: true,                // Enable animation loop
+        grid: true,                   // Show grid
+        gridSize: 6,                 // Grid size
+        gridDivisions: 12,           // Grid divisions
+        
+        // Lighting setup with multiple sources
+        lights: true,
+        ambientColor: 0xffffff,
+        ambientIntensity: 0.4,
+        directionalColor: 0xffffee,
+        directionalIntensity: 0.6,
+        pointLight: true,
+        pointLightColor: 0xff88ff,
+        pointLightIntensity: 0.5,
+        pointLightX: 2,
+        pointLightY: 3,
+        pointLightZ: 2,
+        
+        // Material options - use Standard material for PBR
+        materialType: 'standard',
+        metalness: 0.3,
+        roughness: 0.4,
+        
+        // Enable shadow mapping for depth
+        shadowMap: true,
+        
+        // Point rendering
+        pointRadius: 0.1,
+        pointSegments: 20,
+        
+        // Camera settings
+        fov: 70,
+        z: 5,
+        h: 0.8,
+        p: 0.4,
+        
+        // Canvas size
+        width: '800px',
+        height: '600px',
+        
+        // Line rendering
+        lineWidth: 2,
+        
+        // Visual options
+        backgroundColor: 0x1a1a2e,
+        antialias: true,
+        controls: true,
+        responsive: false,
+        doubleSided: true
+      }));
+      
+      // Helper function to convert HSL to RGB color
+      function hslToRgb(h, s, l) {
+        h = h / 360;
+        s = s / 100;
+        l = l / 100;
+        
+        var r, g, b;
+        if (s === 0) {
+          r = g = b = l;
+        } else {
+          var hue2rgb = function(p, q, t) {
+            if (t < 0) t += 1;
+            if (t > 1) t -= 1;
+            if (t < 1/6) return p + (q - p) * 6 * t;
+            if (t < 1/2) return q;
+            if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+            return p;
+          };
+          
+          var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+          var p = 2 * l - q;
+          r = hue2rgb(p, q, h + 1/3);
+          g = hue2rgb(p, q, h);
+          b = hue2rgb(p, q, h - 1/3);
+        }
+        
+        return (Math.round(r * 255) << 16) | (Math.round(g * 255) << 8) | Math.round(b * 255);
+      }
+    });
+  </SCRIPT>
+</BODY>
+</html>

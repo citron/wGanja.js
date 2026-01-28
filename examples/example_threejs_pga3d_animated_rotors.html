@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<HEAD>
+  <meta charset="utf-8">
+  <title>Three.js PGA3D Animated Rotors Example</title>
+  <SCRIPT SRC="../node_modules/three/build/three.min.js"></SCRIPT>
+  <SCRIPT SRC="../ganja.js"></SCRIPT>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+    }
+    .description {
+      margin-bottom: 20px;
+      color: #666;
+      max-width: 800px;
+    }
+    #canvas-container {
+      width: 800px;
+      height: 600px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+  </style>
+</HEAD>
+<BODY>
+  <h1>Three.js Enhanced Visualization - PGA3D Animated Rotors</h1>
+  <div class="description">
+    This example demonstrates the new Three.js integration in Ganja.js for enhanced 3D rendering.
+    Features include custom materials (Phong shading), dynamic lighting, and smooth animations of rotors in 3D PGA.
+    The scene shows points rotating around different axes with proper lighting and shadows.
+  </div>
+  <div id="canvas-container"></div>
+  
+  <SCRIPT>
+    // Create a Clifford Algebra with 3,0,1 metric for 3D PGA
+    Algebra(3, 0, 1, () => {
+      
+      // Define geometric primitives
+      var point = (x, y, z) => !(1e0 + x*1e1 + y*1e2 + z*1e3);
+      var line = (...plucker) => (plucker * [1e01, 1e02, 1e03, 1e12, 1e13, 1e23]).Normalized;
+      var plane = (a, b, c, d) => (a*1e1 + b*1e2 + c*1e3 + d*1e0).Normalized;
+      
+      // Create a motor (rotor) generator
+      var motor = (line, angle_or_distance) => Math.E ** (angle_or_distance / 2 * line);
+      
+      // Define some points to animate
+      var P1 = point(0, 0, -1);
+      var P2 = point(0.5, 0.3, -0.8);
+      var P3 = point(-0.4, 0.5, -0.9);
+      var P4 = point(0.3, -0.4, -1.1);
+      
+      // Define rotation axes
+      var axisZ = line(0, 0, 0.5, 0, 0, 1);  // Z-axis rotation
+      var axisX = line(0, 0, 0.5, 1, 0, 0);  // X-axis rotation
+      var axisY = line(0, 0, 0.5, 0, 1, 0);  // Y-axis rotation
+      
+      // Create some reference planes
+      var planeXY = plane(0, 0, 1, 0.5);
+      var planeXZ = plane(0, 1, 0, 0.3);
+      
+      // Render function with animation
+      var container = document.getElementById('canvas-container');
+      container.appendChild(this.graph(() => {
+        // Animation time
+        var t = performance.now() / 1000;
+        var angle1 = t * Math.PI / 2;
+        var angle2 = t * Math.PI / 3;
+        var angle3 = t * Math.PI / 4;
+        
+        // Create rotors for different axes
+        var R1 = motor(axisZ, angle1);
+        var R2 = motor(axisX, angle2);
+        var R3 = motor(axisY, angle3);
+        
+        // Apply rotations to points
+        var rotatedP1 = R1 >>> P1;
+        var rotatedP2 = R2 >>> P2;
+        var rotatedP3 = R3 >>> P3;
+        var rotatedP4 = motor(axisZ, angle1 * 0.5) >>> P4;
+        
+        return [
+          "Animated Rotors in 3D PGA",
+          
+          // Original points in one color
+          0x0088ff, P1, P2, P3, P4,
+          
+          // Rotated points in different colors
+          0xff0088, rotatedP1, "P1'",
+          0x88ff00, rotatedP2, "P2'",
+          0xffaa00, rotatedP3, "P3'",
+          0xff0044, rotatedP4, "P4'",
+          
+          // Lines showing rotation paths
+          0x888888, [P1, rotatedP1],
+          0x888888, [P2, rotatedP2],
+          0x888888, [P3, rotatedP3],
+          
+          // Reference planes with transparency
+          0x4444ff, planeXY * 0.3,
+          0x44ff44, planeXZ * 0.3,
+          
+          // Rotation axes as lines
+          0xff8800, axisZ,
+          0xff0088, axisX,
+          0x00ff88, axisY,
+        ];
+      }, {
+        useThree: true,              // Enable Three.js renderer
+        animate: true,                // Enable animation loop
+        grid: true,                   // Show grid
+        gridSize: 4,                 // Grid size
+        gridDivisions: 8,            // Grid divisions
+        
+        // Lighting options
+        lights: true,
+        ambientIntensity: 0.5,
+        directionalIntensity: 0.7,
+        pointLight: true,
+        pointLightY: 3,
+        pointLightIntensity: 0.3,
+        
+        // Material options
+        materialType: 'phong',       // Use Phong material for nice highlights
+        shininess: 50,
+        metalness: 0.2,
+        roughness: 0.6,
+        
+        // Shadow mapping
+        shadowMap: true,
+        
+        // Point rendering
+        pointRadius: 0.08,
+        pointSegments: 16,
+        
+        // Camera settings
+        fov: 60,
+        z: 6,
+        h: 0.5,
+        p: 0.3,
+        
+        // Canvas size
+        width: '800px',
+        height: '600px',
+        
+        // Line width
+        lineWidth: 2,
+        
+        // Other options
+        backgroundColor: 0xe8f4f8,
+        antialias: true,
+        controls: true,              // Enable mouse controls
+        responsive: false
+      }));
+    });
+  </SCRIPT>
+</BODY>
+</html>
