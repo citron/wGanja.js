@@ -667,15 +667,30 @@ blades follow the expected pattern. e.g. **"mv.e12"** or **"mv.e012"**.
 
 By default, your algebra elements will inherit from Float32Array.
 You can change the underlying datatype used by ganja.js to any of the
-typed array basis types :
+typed array basis types. **Float64Array** is recommended for applications
+requiring higher numerical precision:
 
 ```javascript
 
-var R3_32 = Algebra(3);
+var R3_32 = Algebra(3);  // Default: Float32Array (single precision)
 
-var R3_64 = Algebra({p:3,baseType:Float64Array});
+var R3_64 = Algebra({p:3,baseType:Float64Array});  // Double precision
 
 ```
+
+**When to use Float64Array:**
+* Scientific computing and simulations requiring high accuracy
+* Iterative algorithms where rounding errors accumulate (physics engines, optimization)
+* High-dimensional geometric algebra operations
+* Applications where numerical stability is critical
+
+**When Float32Array is sufficient:**
+* Graphics and visualization (standard for WebGL)
+* Memory-constrained environments (uses half the memory)
+* Applications with moderate precision requirements
+
+See `examples/example_precision_float64.html` for a detailed comparison
+demonstrating precision improvements with Float64Array.
 
 ### Custom Cayley Table
 
