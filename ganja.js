@@ -219,7 +219,11 @@
           if (typeof coef === "string") {
             // Symbolic coefficient
             if (coef && coef !== "0") {
-              res.push((coef==="1" && i ? '' : '('+coef+')')+(i==0?'':tot==1&&q==1?'i':basis[i].replace('e','e_')));
+              // Check if coefficient is a simple identifier (no operators, just alphanumeric)
+              var isSimple = /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(coef);
+              // Only wrap in parentheses if not simple
+              var coefStr = (coef==="1" && i) ? '' : (isSimple ? coef : '('+coef+')');
+              res.push(coefStr+(i==0?'':tot==1&&q==1?'i':basis[i].replace('e','e_')));
             }
           } else if (Math.abs(coef)>1e-10) {
             // Numeric coefficient
@@ -309,73 +313,73 @@
   /// If the 'symbolic' option is set, operations handle string coefficients for symbolic manipulation.
     if (options.symbolic) {
       // Symbolic operations
-      generator.prototype.Add = function(b,res) {
+      generator.prototype.Add = function(other,res) {
         res=res||new this.constructor();
         for (var i=0; i<basis.length; i++) {
-          var a=this[i], bb=b[i];
-          if (typeof a=="string" || typeof bb=="string") {
-            if (!a || a===0) res[i] = ""+bb;
-            else if (!bb || bb===0) res[i] = ""+a;
-            else res[i]="("+(a||"0")+(bb.toString()[0]=="-"?"":"+")+bb+")";
-          } else res[i]=(a||0)+(bb||0);
+          var aCoef=this[i], bCoef=other[i];
+          if (typeof aCoef==="string" || typeof bCoef==="string") {
+            if (!aCoef || aCoef===0) res[i] = ""+bCoef;
+            else if (!bCoef || bCoef===0) res[i] = ""+aCoef;
+            else res[i]="("+(aCoef||"0")+(bCoef.toString()[0]==="-"?"":"+")+bCoef+")";
+          } else res[i]=(aCoef||0)+(bCoef||0);
         }
         return res;
       };
-      generator.prototype.Sub = function(b,res) {
+      generator.prototype.Sub = function(other,res) {
         res=res||new this.constructor();
         for (var i=0; i<basis.length; i++) {
-          var a=this[i], bb=b[i];
-          if (typeof a=="string" || typeof bb=="string") {
-            if (!a || a===0) res[i] = typeof bb=="string" ? "-"+bb : -bb;
-            else if (!bb || bb===0) res[i] = ""+a;
-            else res[i]="("+(a||"0")+"-"+bb+")";
-          } else res[i]=(a||0)-(bb||0);
+          var aCoef=this[i], bCoef=other[i];
+          if (typeof aCoef==="string" || typeof bCoef==="string") {
+            if (!aCoef || aCoef===0) res[i] = typeof bCoef==="string" ? "-"+bCoef : -bCoef;
+            else if (!bCoef || bCoef===0) res[i] = ""+aCoef;
+            else res[i]="("+(aCoef||"0")+"-"+bCoef+")";
+          } else res[i]=(aCoef||0)-(bCoef||0);
         }
         return res;
       };
-      generator.prototype.Scale = function(s,res) {
+      generator.prototype.Scale = function(scalar,res) {
         res=res||new this.constructor();
         for (var i=0; i<basis.length; i++) {
-          var a=this[i];
-          if (typeof a=="string" || typeof s=="string") {
-            if (!a || a===0) res[i] = 0;
-            else if (s===1) res[i] = a;
-            else if (s===-1) res[i] = typeof a=="string" ? "-("+a+")" : -a;
-            else res[i]="("+a+")*("+s+")";
-          } else res[i]=(a||0)*s;
+          var coef=this[i];
+          if (typeof coef==="string" || typeof scalar==="string") {
+            if (!coef || coef===0) res[i] = 0;
+            else if (scalar===1) res[i] = coef;
+            else if (scalar===-1) res[i] = typeof coef==="string" ? "-("+coef+")" : -coef;
+            else res[i]="("+coef+")*("+scalar+")";
+          } else res[i]=(coef||0)*scalar;
         }
         return res;
       };
-      generator.prototype.Mul = function(b,res) {
+      generator.prototype.Mul = function(other,res) {
         res=res||new this.constructor();
         for (var ri=0; ri<basis.length; ri++) {
           var terms = [];
           for (var xi=0; xi<basis.length; xi++) {
             for (var yi=0; yi<basis.length; yi++) {
               if (mulTable[xi][yi] === basis[ri] || mulTable[xi][yi] === '-'+basis[ri]) {
-                var a=this[xi], bb=b[yi];
-                if (a && bb) {
+                var aCoef=this[xi], bCoef=other[yi];
+                if (aCoef && bCoef) {
                   var sign = mulTable[xi][yi][0]==='-' ? -1 : 1;
-                  if (typeof a=="string" || typeof bb=="string") {
+                  if (typeof aCoef==="string" || typeof bCoef==="string") {
                     var term = "";
                     if (sign===-1) term += "-";
-                    if (typeof a=="string" && a!=="1") term += "("+a+")";
-                    else if (typeof a=="number" && a!==1) term += a;
-                    else if (a===1 || a==="1") { if (!term) term = ""; }
-                    else term += a;
+                    if (typeof aCoef==="string" && aCoef!=="1") term += "("+aCoef+")";
+                    else if (typeof aCoef==="number" && aCoef!==1) term += aCoef;
+                    else if (aCoef===1 || aCoef==="1") { if (!term) term = ""; }
+                    else term += aCoef;
                     
                     if (term && term!=="-" && term!=="") term += "*";
                     
-                    if (typeof bb=="string" && bb!=="1") term += "("+bb+")";
-                    else if (typeof bb=="number" && bb!==1) term += bb;
-                    else if (bb===1 || bb==="1") { if (!term || term==="-" || term==="" || term==="*") term = term.replace("*","")+(sign===-1?"-1":"1"); }
-                    else term += bb;
+                    if (typeof bCoef==="string" && bCoef!=="1") term += "("+bCoef+")";
+                    else if (typeof bCoef==="number" && bCoef!==1) term += bCoef;
+                    else if (bCoef===1 || bCoef==="1") { if (!term || term==="-" || term==="" || term==="*") term = term.replace("*","")+(sign===-1?"-1":"1"); }
+                    else term += bCoef;
                     
                     term = term.replace(/\*$/,"");
                     if (!term || term==="") term = "1";
                     terms.push(term);
                   } else {
-                    var val = sign*a*bb;
+                    var val = sign*aCoef*bCoef;
                     if (val!==0) terms.push(val);
                   }
                 }
@@ -383,7 +387,7 @@
             }
           }
           if (terms.length>0) {
-            if (terms.some(t=>typeof t=="string")) {
+            if (terms.some(t=>typeof t==="string")) {
               res[ri] = terms.join("+").replace(/\+\-/g,"-").replace(/\(\+/g,'(');
             } else {
               res[ri] = terms.reduce((sum,t)=>sum+t,0);
@@ -394,7 +398,7 @@
         }
         return res;
       };
-      generator.prototype.Wedge = function(b,res) {
+      generator.prototype.Wedge = function(other,res) {
         res=res||new this.constructor();
         for (var ri=0; ri<basis.length; ri++) {
           var terms = [];
@@ -402,29 +406,29 @@
             for (var yi=0; yi<basis.length; yi++) {
               if ((mulTable[xi][yi] === basis[ri] || mulTable[xi][yi] === '-'+basis[ri]) && 
                   grades[ri] === grades[xi]+grades[yi]) {
-                var a=this[xi], bb=b[yi];
-                if (a && bb) {
+                var aCoef=this[xi], bCoef=other[yi];
+                if (aCoef && bCoef) {
                   var sign = mulTable[xi][yi][0]==='-' ? -1 : 1;
-                  if (typeof a=="string" || typeof bb=="string") {
+                  if (typeof aCoef==="string" || typeof bCoef==="string") {
                     var term = "";
                     if (sign===-1) term += "-";
-                    if (typeof a=="string" && a!=="1") term += "("+a+")";
-                    else if (typeof a=="number" && a!==1) term += a;
-                    else if (a===1 || a==="1") { if (!term) term = ""; }
-                    else term += a;
+                    if (typeof aCoef==="string" && aCoef!=="1") term += "("+aCoef+")";
+                    else if (typeof aCoef==="number" && aCoef!==1) term += aCoef;
+                    else if (aCoef===1 || aCoef==="1") { if (!term) term = ""; }
+                    else term += aCoef;
                     
                     if (term && term!=="-" && term!=="") term += "*";
                     
-                    if (typeof bb=="string" && bb!=="1") term += "("+bb+")";
-                    else if (typeof bb=="number" && bb!==1) term += bb;
-                    else if (bb===1 || bb==="1") { if (!term || term==="-" || term==="" || term==="*") term = term.replace("*","")+(sign===-1?"-1":"1"); }
-                    else term += bb;
+                    if (typeof bCoef==="string" && bCoef!=="1") term += "("+bCoef+")";
+                    else if (typeof bCoef==="number" && bCoef!==1) term += bCoef;
+                    else if (bCoef===1 || bCoef==="1") { if (!term || term==="-" || term==="" || term==="*") term = term.replace("*","")+(sign===-1?"-1":"1"); }
+                    else term += bCoef;
                     
                     term = term.replace(/\*$/,"");
                     if (!term || term==="") term = "1";
                     terms.push(term);
                   } else {
-                    var val = sign*a*bb;
+                    var val = sign*aCoef*bCoef;
                     if (val!==0) terms.push(val);
                   }
                 }
@@ -432,7 +436,7 @@
             }
           }
           if (terms.length>0) {
-            if (terms.some(t=>typeof t=="string")) {
+            if (terms.some(t=>typeof t==="string")) {
               res[ri] = terms.join("+").replace(/\+\-/g,"-").replace(/\(\+/g,'(');
             } else {
               res[ri] = terms.reduce((sum,t)=>sum+t,0);
@@ -460,6 +464,9 @@
 
   /// Symbolic manipulation methods
     if (options.symbolic) {
+      // Maximum iterations for iterative simplification
+      var MAX_SIMPLIFICATION_ITERATIONS = 10;
+      
       // Simplify symbolic expressions
       generator.prototype.Simplify = function() {
         var res = new this.constructor();
@@ -468,8 +475,7 @@
             var expr = this[i];
             // Iteratively simplify until no more changes
             var prevExpr;
-            var maxIter = 10;
-            for (var iter=0; iter<maxIter && expr!==prevExpr; iter++) {
+            for (var iter=0; iter<MAX_SIMPLIFICATION_ITERATIONS && expr!==prevExpr; iter++) {
               prevExpr = expr;
               // Simplify nested negations like -(-(x)) to x
               expr = expr.replace(/-\(-([^()]+)\)/g,'$1');  // -(-x) -> x
