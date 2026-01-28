@@ -426,7 +426,7 @@ inline PGA3D operator - (const PGA3D &a, const float &b) {
 };
 
 
-inline float PGA3D::norm() { return sqrt(abs(((*this)*Conjugate()).mvec[0])); }
+inline float PGA3D::norm() { return sqrt(std::abs(((*this)*Conjugate()).mvec[0])); }
 inline float PGA3D::inorm() { return (!(*this)).norm(); }
 inline PGA3D PGA3D::normalized() { return (*this) * (1/norm()); }
 
