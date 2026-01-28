@@ -274,6 +274,51 @@ amble:`
 `
 })
 
+// rust template for DCGA3D - Double Conformal Geometric Algebra
+var DCGA3D = (basis,classname)=>({
+preamble:`
+    // Double Conformal GA - 6,2 metric for 3D space with dual conformal structure
+    pub fn no1() -> Self { 0.5 * (Self::em1() - Self::ep1()) }
+    pub fn ni1() -> Self { Self::ep1() + Self::em1() }
+    pub fn no2() -> Self { 0.5 * (Self::em2() - Self::ep2()) }
+    pub fn ni2() -> Self { Self::ep2() + Self::em2() }
+    pub fn no() -> Self { Self::no1() + Self::no2() }
+    pub fn ni() -> Self { Self::ni1() + Self::ni2() }
+
+    // Upcast 3D point to DCGA point
+    pub fn up(x: float_t, y: float_t, z: float_t) -> Self {
+        let d = x*x + y*y + z*z;
+        Self::no() + x * Self::e1() + y * Self::e2() + z * Self::e3() + 0.5 * d * Self::ni()
+    }
+
+    // Create sphere at (x,y,z) with radius r
+    pub fn sphere(x: float_t, y: float_t, z: float_t, r: float_t) -> Self {
+        Self::up(x, y, z) - 0.5 * r * r * Self::ni()
+    }
+
+    // Oriented point - point with normal (uses second conformal dimension)
+    pub fn oriented_point(x: float_t, y: float_t, z: float_t, nx: float_t, ny: float_t, nz: float_t) -> Self {
+        let p = Self::up(x, y, z);
+        let n = nx * Self::e1() + ny * Self::e2() + nz * Self::e3();
+        p + n * Self::ni2()
+    }
+`,
+amble:`
+  let p1 = ${classname}::up(1.0, 0.0, 0.0);
+  let p2 = ${classname}::up(0.0, 1.0, 0.0);
+  let p3 = ${classname}::up(0.0, 0.0, 1.0);
+  let s = ${classname}::sphere(0.5, 0.5, 0.5, 1.0);
+  let op = ${classname}::oriented_point(1.0, 0.0, 0.0, 0.0, 1.0, 0.0);
+  
+  println!("point p1      : {}", p1);
+  println!("point p2      : {}", p2);
+  println!("point p3      : {}", p3);
+  println!("sphere        : {}", s);
+  println!("oriented pt   : {}", op);
+  println!("circle p1^p2^p3^ni : {}", p1.clone() ^ p2.clone() ^ p3.clone() ^ ${classname}::ni());
+`
+})
+
 // rust template for PGA
 var PGA3D = (basis,classname)=>({
 preamble:`
@@ -381,4 +426,4 @@ fn main() {
 ${example.amble}
 }`;
 
-Object.assign(exports,{preamble,postamble,unary,binary,desc:"rust",PGA3D,CGA,GENERIC});
+Object.assign(exports,{preamble,postamble,unary,binary,desc:"rust",PGA3D,CGA,DCGA3D,GENERIC});

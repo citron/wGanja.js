@@ -115,6 +115,60 @@ amble:`
 `
 })
 
+// cs template for DCGA3D - Double Conformal Geometric Algebra
+var DCGA3D = (basis,classname)=>({
+preamble:`
+		// Double Conformal GA - 6,2 metric for 3D space with dual conformal structure
+		public static ${classname} e1 = new ${classname}(1f, 1);
+		public static ${classname} e2 = new ${classname}(1f, 2);
+		public static ${classname} e3 = new ${classname}(1f, 3);
+		public static ${classname} ep1 = new ${classname}(1f, 4);
+		public static ${classname} em1 = new ${classname}(1f, 5);
+		public static ${classname} ep2 = new ${classname}(1f, 6);
+		public static ${classname} em2 = new ${classname}(1f, 7);
+
+		// Null basis - two conformal dimensions
+		public static ${classname} no1 = 0.5f*(em1-ep1);
+		public static ${classname} ni1 = ep1+em1;
+		public static ${classname} no2 = 0.5f*(em2-ep2);
+		public static ${classname} ni2 = ep2+em2;
+		public static ${classname} no = no1+no2;
+		public static ${classname} ni = ni1+ni2;
+
+		// Upcast 3D point to DCGA point
+		public static ${classname} up(float x, float y, float z) {
+			float d = x*x + y*y + z*z;
+			return no + x*e1 + y*e2 + z*e3 + 0.5f*d*ni;
+		}
+
+		// Create sphere at (x,y,z) with radius r
+		public static ${classname} sphere(float x, float y, float z, float r) {
+			return up(x,y,z) - 0.5f*r*r*ni;
+		}
+
+		// Oriented point - point with normal (uses second conformal dimension)
+		public static ${classname} oriented_point(float x, float y, float z, float nx, float ny, float nz) {
+			var p = up(x,y,z);
+			var n = nx*e1 + ny*e2 + nz*e3;
+			return p + n*ni2;
+		}
+`,
+amble:`
+			var p1 = up(1.0f,0.0f,0.0f);
+			var p2 = up(0.0f,1.0f,0.0f);
+			var p3 = up(0.0f,0.0f,1.0f);
+			var s = sphere(0.5f,0.5f,0.5f,1.0f);
+			var op = oriented_point(1.0f,0.0f,0.0f, 0.0f,1.0f,0.0f);
+			
+			Console.WriteLine("point p1      : "+p1);
+			Console.WriteLine("point p2      : "+p2);
+			Console.WriteLine("point p3      : "+p3);
+			Console.WriteLine("sphere        : "+s);
+			Console.WriteLine("oriented pt   : "+op);
+			Console.WriteLine("circle p1^p2^p3^ni : "+(p1^p2^p3^ni));
+`
+})
+
 // cs template for PGA example
 var PGA3D = (basis,classname)=>({
 preamble:`
@@ -267,4 +321,4 @@ var postamble = (basis, classname, example)=>
 `;
 
 
-Object.assign(exports,{preamble,postamble,unary,binary,desc:"c#",PGA3D,CGA,GENERIC});
+Object.assign(exports,{preamble,postamble,unary,binary,desc:"c#",PGA3D,CGA,DCGA3D,GENERIC});

@@ -1,0 +1,155 @@
+<HEAD>
+  <SCRIPT SRC="../ganja.js"></SCRIPT>
+</HEAD>
+<BODY><SCRIPT>
+// Create a Clifford Algebra with 6,2 metric for 3D DCGA (Double Conformal GA)
+Algebra(6,2,()=>{ 
+
+  // Double Conformal GA extends CGA by adding a second conformal dimension
+  // This allows representation of oriented contact elements (point + normal)
+  // Useful for robotics, kinematic chains with contact constraints, and advanced shape modeling
+  
+  // https://link.springer.com/chapter/10.1007/978-3-319-74830-6_13
+  // https://www.researchgate.net/publication/226450308_Double_Conformal_Geometric_Algebra
+  
+  // Null Basis - we use two sets of conformal dimensions
+  // First conformal space (for positions)
+  var e1 = 1e1, e2 = 1e2, e3 = 1e3;
+  var ep1 = 1e4, em1 = 1e5;  // First conformal pair (positive/negative)
+  var ep2 = 1e6, em2 = 1e7;  // Second conformal pair (positive/negative)
+  
+  // Origins and infinities for both conformal spaces
+  var no1 = .5*(em1 - ep1), ni1 = ep1 + em1;  // First conformal space
+  var no2 = .5*(em2 - ep2), ni2 = ep2 + em2;  // Second conformal space
+  
+  // Combined origin and infinity
+  var no = no1 + no2, ni = ni1 + ni2;
+  
+  // Upcast 3D point to DCGA point (standard position)
+  var up = (x,y,z) => {
+    var p = x*e1 + y*e2 + z*e3;
+    var psq = x*x + y*y + z*z;
+    return no + p + .5*psq*ni;
+  };
+  
+  // Create an oriented point (point + normal direction)
+  // This is the key advantage of DCGA - representing contact points
+  var oriented_point = (x,y,z,nx,ny,nz) => {
+    var p = up(x,y,z);
+    var n = nx*e1 + ny*e2 + nz*e3;
+    // The second conformal dimension encodes orientation
+    return p + n*ni2;
+  };
+  
+  // Create a sphere at position (x,y,z) with radius r
+  var sphere = (x,y,z,r) => {
+    var c = up(x,y,z);
+    return c - .5*r*r*ni;
+  };
+  
+  // Motor/rotor for rotation around axis through point p with angle theta
+  var rotor = (angle, axis) => {
+    var half = angle/2;
+    return Math.cos(half) + Math.sin(half) * axis.Normalized;
+  };
+  
+  // Translator for distance d along direction v
+  var translator = (d, v) => {
+    return 1 + .5*d*ni*v.Normalized;
+  };
+  
+  // ========== Kinematic Chain Example ==========
+  // We'll create a simple 3D robot arm with 3 links
+  // Each joint can rotate, and we track contact points
+  
+  var link_length = 1.0;
+  var num_joints = 4;
+  
+  // Joint angles (animated)
+  var getAngles = () => {
+    var t = performance.now() / 1000;
+    return [
+      Math.sin(t * 0.5) * Math.PI/3,      // Base rotation
+      Math.cos(t * 0.7) * Math.PI/4,      // First joint
+      Math.sin(t * 0.9) * Math.PI/4,      // Second joint
+      Math.cos(t * 1.1) * Math.PI/6       // End effector
+    ];
+  };
+  
+  // Forward kinematics - compute positions of all joints
+  var computeChain = (angles) => {
+    var joints = [];
+    var current_pos = [0, 0, 0];
+    var current_dir = [0, 0, 1];  // Initial direction: up along z
+    
+    joints.push(up(0, 0, 0));  // Base
+    
+    for (var i = 0; i < num_joints; i++) {
+      var angle = angles[i];
+      // Rotate direction
+      var ca = Math.cos(angle), sa = Math.sin(angle);
+      var axis = i % 2 == 0 ? [1, 0, 0] : [0, 1, 0];  // Alternate rotation axes
+      
+      // Simple rotation in plane
+      if (i % 2 == 0) {
+        current_dir = [current_dir[0], 
+                       current_dir[1] * ca - current_dir[2] * sa,
+                       current_dir[1] * sa + current_dir[2] * ca];
+      } else {
+        current_dir = [current_dir[0] * ca + current_dir[2] * sa,
+                       current_dir[1],
+                       -current_dir[0] * sa + current_dir[2] * ca];
+      }
+      
+      // Move along direction
+      current_pos[0] += current_dir[0] * link_length;
+      current_pos[1] += current_dir[1] * link_length;
+      current_pos[2] += current_dir[2] * link_length;
+      
+      joints.push(up(current_pos[0], current_pos[1], current_pos[2]));
+    }
+    
+    return joints;
+  };
+  
+  // Create some reference spheres for visualization
+  var s1 = sphere(2, 0, 2, 0.5);
+  var s2 = sphere(-1, 2, 1, 0.4);
+  var s3 = sphere(0, -2, 3, 0.6);
+  
+  // Animation and rendering
+  document.body.appendChild(this.graph(() => {
+    var angles = getAngles();
+    var joints = computeChain(angles);
+    
+    // Build rendering list
+    var elements = [
+      0x444444, "DCGA3D Kinematic Chain",
+      
+      // Draw reference spheres
+      0x20FF8800, s1,
+      0x2088FF00, s2, 
+      0x20FF0088, s3,
+      
+      // Draw joints as points
+      0x00DD88, ...joints,
+      
+      // Draw links between joints
+      0x008844, ...joints.slice(0, -1).map((j, i) => [j, joints[i + 1]]).flat(),
+      
+      // Label base and end effector
+      0x880088, joints[0], "Base",
+      0xDD0088, joints[joints.length - 1], "End Effector"
+    ];
+    
+    return elements;
+  }, {
+    conformal: true,
+    gl: true,
+    grid: true,
+    animate: true,
+    lineWidth: 3
+  }));
+  
+});
+</SCRIPT></BODY>
