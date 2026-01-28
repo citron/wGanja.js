@@ -2,13 +2,16 @@
   "name": "ganja.js",
   "version": "1.0.189",
   "description": "Geometric Algebra for javascript with operator overloading and algebraic literals",
-  "main": "ganja.js",
+  "main": "dist/ganja.js",
   "directories": {
     "example": "examples",
     "codegen": "algebra generator for c++, c#, rust, python"
   },
   "scripts": {
-    "test": "Algebra(0,1,()=>1e1*1e1==-1);"
+    "test": "Algebra(0,1,()=>1e1*1e1==-1);",
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "prepare": "npm run build"
   },
   "repository": {
     "type": "git",
@@ -25,5 +28,10 @@
   "bugs": {
     "url": "https://github.com/enkimute/ganja.js/issues"
   },
-  "homepage": "https://github.com/enkimute/ganja.js#readme"
+  "homepage": "https://github.com/enkimute/ganja.js#readme",
+  "devDependencies": {
+    "@types/node": "^25.1.0",
+    "typescript": "^5.9.3"
+  },
+  "types": "dist/ganja.d.ts"
 }
