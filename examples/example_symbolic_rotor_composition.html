@@ -1,0 +1,79 @@
+<HEAD>
+  <SCRIPT SRC="../ganja.js"></SCRIPT>
+</HEAD>
+<BODY><SCRIPT>
+// Create a 2D Geometric Algebra with symbolic computation enabled
+Algebra({p:2, symbolic:true}, ()=>{ 
+
+  // Define symbolic variables for rotor angles
+  var alpha = new Element();
+  alpha[0] = "cos(α/2)";  // scalar part
+  alpha[3] = "-sin(α/2)"; // e12 bivector part
+  
+  var beta = new Element();
+  beta[0] = "cos(β/2)";   // scalar part
+  beta[3] = "-sin(β/2)";  // e12 bivector part
+  
+  console.log("Rotor R1 (rotation by α):");
+  console.log(alpha.toString());
+  
+  console.log("\nRotor R2 (rotation by β):");
+  console.log(beta.toString());
+  
+  // Compose the two rotors symbolically
+  console.log("\nComposing R1 and R2 (R2 * R1):");
+  var composed = beta.Mul(alpha);
+  console.log(composed.toString());
+  
+  // Simplify the result
+  console.log("\nSimplified composition:");
+  var simplified = composed.Simplify();
+  console.log(simplified.toString());
+  
+  // Show that this represents a rotation by (α + β)
+  console.log("\nNote: This represents a rotation by angle (α + β)");
+  console.log("Expected form: cos((α+β)/2) - sin((α+β)/2)e_12");
+  
+  // Create another example with symbolic point rotation
+  console.log("\n--- Point Rotation Example ---");
+  var point = new Element();
+  point[1] = "x";  // e1 component
+  point[2] = "y";  // e2 component
+  
+  console.log("\nPoint P:");
+  console.log(point.toString());
+  
+  // Rotate point by rotor (R * P * R^)
+  console.log("\nRotating point by rotor R1:");
+  console.log("(Computing R1 * P * R1†)");
+  var rotated = alpha.Mul(point).Mul(alpha.Reverse);
+  console.log(rotated.toString());
+  
+  // Display results in page
+  document.body.innerHTML = `
+    <h2>Symbolic Rotor Composition in 2D Geometric Algebra</h2>
+    
+    <h3>Rotor R1 (rotation by α):</h3>
+    <pre>${alpha.toString()}</pre>
+    
+    <h3>Rotor R2 (rotation by β):</h3>
+    <pre>${beta.toString()}</pre>
+    
+    <h3>Composed Rotor (R2 ∘ R1 = R2 * R1):</h3>
+    <pre>${composed.toString()}</pre>
+    
+    <h3>Simplified:</h3>
+    <pre>${simplified.toString()}</pre>
+    
+    <p><strong>Interpretation:</strong> The composition of two rotations by angles α and β 
+    results in a rotation by (α + β), demonstrating the group properties of rotors in geometric algebra.</p>
+    
+    <h3>Point Rotation Example:</h3>
+    <p>Point P = <code>${point.toString()}</code></p>
+    <p>Rotated point (R1 * P * R1†) = <code>${rotated.toString()}</code></p>
+    
+    <p><em>Note: This is a symbolic computation showing the algebraic structure without numerical evaluation.</em></p>
+  `;
+  
+});
+</SCRIPT></BODY>
