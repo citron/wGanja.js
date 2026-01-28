@@ -5,3 +5,4 @@ codegen/rust/*_rust.pdb
 package.json
 test_symbolic.js
 test_examples.js
+test_final.js
