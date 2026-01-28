@@ -18,6 +18,9 @@
   <link rel="shortcut icon" type="image/x-icon" href="https://enkimute.github.io/ganja.js/images/favicon.ico">
   <link href="https://fonts.googleapis.com/css?family=Encode+Sans+Condensed" rel="stylesheet">
   
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="manifest.json">
+  
   <!-- Local Style -->
   <style>
     body           { background: #20262E; color: #FBFBFB; padding:0; margin:0; display:none; flex-direction:column; min-height:100vh; max-height:100vh; position:relative; overflow:hidden; }
@@ -93,6 +96,23 @@
       50%  { background:#FFCCCC }
       100% { background:#FFFFFF }
     }
+    .offline-banner { 
+      background: #28a745; 
+      color: white; 
+      padding: 8px 15px; 
+      text-align: center; 
+      font-size: 13px; 
+      display: none; 
+      position: relative; 
+      z-index: 1000; 
+    }
+    .offline-banner.show { display: block; }
+    .offline-banner .close-banner { 
+      float: right; 
+      cursor: pointer; 
+      font-weight: bold; 
+      margin-left: 10px; 
+    }
   </style>
   <!-- ganja -->
   <SCRIPT SRC="../ganja.js"></SCRIPT>
@@ -106,6 +126,10 @@
 </HEAD>
 <!-------------------------------------------->
 <BODY>
+  <DIV ID="offline-banner" CLASS="offline-banner">
+    <SPAN CLASS="close-banner" ONCLICK="this.parentElement.classList.remove('show')">&times;</SPAN>
+    <SPAN>✓ Offline mode enabled - CoffeeShop is now available offline!</SPAN>
+  </DIV>
   <DIV CLASS="hider"> 
     <DIV CLASS="intro">
         <DIV CLASS="introBlock" STYLE="text-align:center">
@@ -862,6 +886,33 @@
       }
     }
       
+  // Register Service Worker for offline support
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js')
+          .then(registration => {
+            console.log('Service Worker registered successfully:', registration.scope);
+            // Show offline banner only on first-time installation
+            if (registration.installing) {
+              registration.installing.addEventListener('statechange', (e) => {
+                if (e.target.state === 'activated') {
+                  const banner = document.getElementById('offline-banner');
+                  if (banner) {
+                    banner.classList.add('show');
+                    // Auto-hide after 5 seconds
+                    setTimeout(() => {
+                      banner.classList.remove('show');
+                    }, 5000);
+                  }
+                }
+              });
+            }
+          })
+          .catch(error => {
+            console.log('Service Worker registration failed:', error);
+          });
+      });
+    }
     
       
   </SCRIPT>

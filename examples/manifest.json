@@ -1,0 +1,18 @@
+{
+  "name": "Ganja.js CoffeeShop",
+  "short_name": "CoffeeShop",
+  "description": "Free ganja.js samples - playground and sample browser for Geometric Algebra",
+  "start_url": "/examples/coffeeshop.html",
+  "display": "standalone",
+  "background_color": "#20262E",
+  "theme_color": "#0084FF",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "https://enkimute.github.io/ganja.js/images/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    }
+  ],
+  "scope": "/examples/"
+}
