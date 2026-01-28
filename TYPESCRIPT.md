@@ -9,7 +9,7 @@ Ganja.js has been enhanced with TypeScript support while maintaining full backwa
 ## Structure
 
 ```
-wGanja.js/
+ganja.js/
 ├── src/               # TypeScript source files
 │   ├── ganja.js       # Main library (JavaScript with type definitions)
 │   ├── ganja.d.ts     # Comprehensive type definitions
