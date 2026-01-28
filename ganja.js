@@ -466,17 +466,30 @@
         for (var i=0; i<basis.length; i++) {
           if (typeof this[i]=="string") {
             var expr = this[i];
-            // Remove unnecessary parentheses and simplify basic patterns
-            expr = expr.replace(/\(\+/g,'(').replace(/\(0\)/g,'0').replace(/\(1\)/g,'1');
-            // Simplify double negatives
-            expr = expr.replace(/--/g,'+');
-            // Remove terms with 0
-            expr = expr.replace(/\+0\+/g,'+').replace(/\+0$/,'').replace(/^0\+/,'');
-            // Simplify 1* and *1
-            expr = expr.replace(/1\*/g,'').replace(/\*1(?!\d)/g,'');
-            // Remove outer parentheses if not necessary
-            if (expr.match(/^\(.*\)$/) && !expr.slice(1,-1).match(/^[^()]*[\+\-][^()]*$/)) {
-              expr = expr.slice(1,-1);
+            // Iteratively simplify until no more changes
+            var prevExpr;
+            var maxIter = 10;
+            for (var iter=0; iter<maxIter && expr!==prevExpr; iter++) {
+              prevExpr = expr;
+              // Simplify nested negations like -(-(x)) to x
+              expr = expr.replace(/-\(-([^()]+)\)/g,'$1');  // -(-x) -> x
+              expr = expr.replace(/\(\(-([^()]+)\)\)/g,'-$1'); // ((-x)) -> -x
+              // Remove unnecessary outer parentheses for simple expressions
+              expr = expr.replace(/^\(([^()]*)\)$/,'$1');
+              // Remove parentheses around single terms
+              expr = expr.replace(/\(([a-zA-Z_][a-zA-Z0-9_]*)\)/g,'$1');
+              // Simplify double negatives
+              expr = expr.replace(/--/g,'+').replace(/\+-/g,'-');
+              // Remove identity operations
+              expr = expr.replace(/\*1(?!\d)/g,'').replace(/1\*(?!\d)/g,'');
+              // Remove addition/subtraction with 0
+              expr = expr.replace(/\+0(?!\d)/g,'').replace(/^0\+/,'').replace(/-0(?!\d)/g,'');
+              // Clean up multiple operators
+              expr = expr.replace(/\+\+/g,'+').replace(/\+\-/g,'-');
+              // Remove empty parentheses
+              expr = expr.replace(/\(\)/g,'');
+              // Simplify expressions like -(a) to -a when a is simple
+              expr = expr.replace(/-\(([a-zA-Z_][a-zA-Z0-9_\/]*)\)/g,'-$1');
             }
             res[i] = expr||0;
           } else {
